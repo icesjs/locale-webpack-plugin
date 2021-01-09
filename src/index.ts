@@ -1,3 +1,4 @@
 /// <reference path="../lib/lib.d.ts" />
-import LocalePlugin from './LocalePlugin'
+
+import LocalePlugin from './Plugin'
 export = LocalePlugin

@@ -1,13 +1,6 @@
-declare module '@craco/craco' {
-  import { Configuration, RuleSetRule } from 'webpack'
-  export function addBeforeLoader(
-    config: Configuration,
-    matcher: (rule: any) => boolean,
-    rule: RuleSetRule
-  ): { isAdded: boolean }
-  export function loaderByName(name: string): (rule: RuleSetRule | string) => boolean
-}
-
+/**
+ * 语言定义模块。
+ */
 declare module '*.yml' {
   export {
     setLocale,
@@ -15,11 +8,13 @@ declare module '*.yml' {
     useLocale,
     Translate,
     Trans,
-    LocaleContext,
     useLocale as default,
   } from '@ices/react-locale'
 }
 
+/**
+ * 语言定义模块。
+ */
 declare module '*.yaml' {
   import useLocale from '*.yml'
   export * from '*.yml'

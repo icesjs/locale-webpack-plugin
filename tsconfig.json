@@ -10,11 +10,13 @@
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
     "noUnusedLocals": true,
-    "removeComments": true,
+    "removeComments": false,
     "sourceMap": true,
     "declaration": true,
     "declarationDir": "types",
     "outDir": "dist",
+    "newLine": "lf",
+    "skipLibCheck": true,
     "types": ["node"]
   },
   "include": ["src"]
