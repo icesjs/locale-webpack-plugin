@@ -1,6 +1,6 @@
 {
   "name": "@ices/react-locale-webpack-plugin",
-  "version": "1.0.0-alpha",
+  "version": "1.0.1-alpha",
   "description": "Webpack plugin for parse yaml file of locales to a react module",
   "main": "dist/index.js",
   "types": "types/index.d.ts",
