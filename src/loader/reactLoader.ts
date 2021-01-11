@@ -13,26 +13,26 @@ function getModuleCode(this: LoaderContext, resource: string, esModule: boolean)
   return esModule
     ? `
     /** ${this.resourcePath} **/
-    import { withDefinitionsComponent, withDefinitionsHook } from ${runtime}
     import definitions from ${request}
-    export { setLocale, getLocale } from ${runtime}
+    import { withDefinitionsComponent, withDefinitionsHook } from ${runtime}
+    export { setLocale, getLocale, utils, plugins, subscribe } from ${runtime}
     export const Translate = withDefinitionsComponent(definitions)
     export const Trans = Translate
     export const useLocale = withDefinitionsHook(definitions)
-    export default useLocale
+    export { definitions, useLocale as default }
   `
     : `
     const definitions = require(${request})
     const runtime = require(${runtime})
-    const { withDefinitionsComponent, withDefinitionsHook, setLocale, getLocale } = runtime
+    const { withDefinitionsComponent, withDefinitionsHook, setLocale, getLocale, utils, plugins, subscribe } = runtime
     const useLocale = withDefinitionsHook(definitions)
     const Translate = withDefinitionsComponent(definitions)
     const Trans = Translate
-    module.exports = exports = useLocale
-    Object.assign(exports, {
-      setLocale, getLocale,
-      useLocale, Translate, Trans
-    })  
+    Object.assign(module.exports = exports = useLocale, {
+      setLocale, getLocale, subscribe,
+      useLocale, Translate, Trans,
+      utils, plugins, definitions
+    })
   `
 }
 
