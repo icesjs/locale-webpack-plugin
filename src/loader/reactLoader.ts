@@ -14,25 +14,51 @@ function getModuleCode(this: LoaderContext, resource: string, esModule: boolean)
     ? `
     /** ${this.resourcePath} **/
     import definitions from ${request}
-    import { withDefinitionsComponent, withDefinitionsHook } from ${runtime}
-    export { setLocale, getLocale, utils, plugins, subscribe } from ${runtime}
-    export const Translate = withDefinitionsComponent(definitions)
-    export const Trans = Translate
-    export const useLocale = withDefinitionsHook(definitions)
-    export { definitions, useLocale as default }
+    import { withDefinitionsComponent, withDefinitionsHook, withDefinitionsContextHook } from ${runtime}
+    export * from ${runtime}
+    export const Trans = withDefinitionsComponent(definitions)
+    export const Translate = Trans
+    export const useTrans = withDefinitionsHook(definitions)
+    export const useTranslate = useTrans
+    export const useContextTrans = withDefinitionsContextHook(definitions)
+    export const useContextTranslate = useContextTrans
+    export { definitions, useTrans as default }
   `
     : `
+    /** ${this.resourcePath} **/
     const definitions = require(${request})
     const runtime = require(${runtime})
-    const { withDefinitionsComponent, withDefinitionsHook, setLocale, getLocale, utils, plugins, subscribe } = runtime
-    const useLocale = withDefinitionsHook(definitions)
-    const Translate = withDefinitionsComponent(definitions)
-    const Trans = Translate
-    Object.assign(module.exports = exports = useLocale, {
-      setLocale, getLocale, subscribe,
-      useLocale, Translate, Trans,
-      utils, plugins, definitions
-    })
+    const { withDefinitionsComponent, withDefinitionsHook, withDefinitionsContextHook } = runtime
+    
+    Object.defineProperty(exports, '__esModule', { value: true });
+    
+    const Trans = withDefinitionsComponent(definitions)
+    const Translate = Trans
+    const useTrans = withDefinitionsHook(definitions)
+    const useTranslate = useTrans
+    const useContextTrans = withDefinitionsContextHook(definitions)
+    const useContextTranslate = useContextTrans
+    
+    exports.default = useTrans
+    exports.definitions = definitions
+    
+    exports.Trans = Trans
+    exports.Translate = Translate
+    exports.useTrans = useTrans
+    exports.useTranslate = useTranslate
+    exports.useContextTrans = useContextTrans
+    exports.useContextTranslate = useContextTranslate
+    
+    exports.withDefinitionsComponent = withDefinitionsComponent
+    exports.withDefinitionsHook = withDefinitionsHook
+    exports.withDefinitionsContextHook = withDefinitionsContextHook
+    
+    exports.withDefinitions = runtime.withDefinitions
+    exports.getLocale = runtime.getLocale
+    exports.setLocale = runtime.setLocale
+    exports.subscribe = runtime.subscribe
+    exports.plugins = runtime.plugins
+    exports.utils = runtime.utils
   `
 }
 

@@ -1,59 +1,45 @@
-/**
- * 语言定义模块。
- */
 declare module '*.yml' {
+  import { useTrans } from '@ices/react-locale'
   export {
-    /**
-     * 全局设置当前的区域语言值。
-     */
-    setLocale,
-    /**
-     * 获取全局当前设置的区域语言值。
-     */
-    getLocale,
-    /**
-     * 可应用于函数组件内的hooks，用于使用区域语言模块。
-     */
-    useLocale,
-    /**
-     * 转译组件。一般应用于类型组件中。
-     */
-    Translate,
-    /**
-     * Translate 的别名组件。
-     */
     Trans,
-    /**
-     * 绑定至当前模块的语言模块中所定义的内容。插件可获取此值，并在插件 translate 函数中使用。
-     */
+    Translate,
     definitions,
-    /**
-     * 一些可用于语言模块的工具函数。
-     */
-    utils,
-    /**
-     * 模块内部定义的语言内容转换插件。
-     */
+    getLocale,
     plugins,
-    /**
-     * 可订阅全局语言变化的函数。
-     */
+    setLocale,
     subscribe,
-    /**
-     * 可应用于函数组件内的hooks，用于使用区域语言模块。
-     */
-    useLocale as default,
+    useContextTrans,
+    useContextTranslate,
+    useTrans,
+    useTranslate,
+    utils,
+    withDefinitions,
+    withDefinitionsComponent,
+    withDefinitionsContextHook,
+    withDefinitionsHook,
   } from '@ices/react-locale'
+  export default useTrans
 }
 
-/**
- * 语言定义模块。
- */
 declare module '*.yaml' {
-  import useLocale from '*.yml'
-  export * from '*.yml'
-  /**
-   * 可应用于函数组件内的hooks，用于使用区域语言模块。
-   */
-  export default useLocale
+  import { useTrans } from '@ices/react-locale'
+  export {
+    Trans,
+    Translate,
+    definitions,
+    getLocale,
+    plugins,
+    setLocale,
+    subscribe,
+    useContextTrans,
+    useContextTranslate,
+    useTrans,
+    useTranslate,
+    utils,
+    withDefinitions,
+    withDefinitionsComponent,
+    withDefinitionsContextHook,
+    withDefinitionsHook,
+  } from '@ices/react-locale'
+  export default useTrans
 }
