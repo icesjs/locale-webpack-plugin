@@ -1,25 +1,37 @@
-import yaml from 'js-yaml'
+import fs from 'fs'
 import webpack from 'webpack'
 import loaderUtils from 'loader-utils'
 import { LoaderType } from '../Plugin'
+import parseIncludeAsync from '../lib/include'
+import loadResources from '../lib/resource'
 
 type YmlLoader = webpack.loader.Loader & LoaderType
 type LoaderContext = webpack.loader.LoaderContext
 
-function loadLocales(this: LoaderContext, source: string) {
-  let definitions = yaml.load(source, {
-    json: true,
-    onWarning: (err) => {
-      const warning = new Error(err.message)
-      warning.name = 'Warning'
-      warning.stack = ''
-      this.emitWarning(warning)
-    },
-  })
-  if (!definitions || typeof definitions !== 'object') {
-    definitions = {}
+async function loadLocales(this: LoaderContext, source: string) {
+  const { error, warnings, files } = await parseIncludeAsync(
+    source,
+    this.resourcePath,
+    this.fs as typeof fs
+  )
+  // 重设依赖信息
+  this.clearDependencies()
+  for (const { file } of files) {
+    this.addDependency(file)
   }
-  return definitions
+  for (const warn of warnings) {
+    this.emitWarning(warn)
+  }
+  if (error) {
+    // 抛出编译异常
+    throw error
+  }
+  // 处理资源加载
+  const { warnings: resourceWarnings, data } = loadResources(files)
+  for (const warn of resourceWarnings) {
+    this.emitWarning(warn)
+  }
+  return data
 }
 
 /**
@@ -27,8 +39,15 @@ function loadLocales(this: LoaderContext, source: string) {
  */
 const ymlLoader: YmlLoader = function (this: LoaderContext, source: string | Buffer) {
   const { esModule } = loaderUtils.getOptions(this)
-  const content = loadLocales.call(this, source as string)
-  return `${esModule ? 'export default ' : 'module.exports='}${JSON.stringify(content)}`
+  const callback = this.async() || (() => {})
+  //
+  loadLocales
+    .call(this, source as string)
+    .then((content) => {
+      const code = `${esModule ? 'export default ' : 'module.exports='}${JSON.stringify(content)}`
+      callback(null, code)
+    })
+    .catch((err) => callback(err instanceof Error ? err : new Error(`${err}`)))
 }
 
 ymlLoader.resourceQuery = /ya?ml/

@@ -2,64 +2,27 @@ import path from 'path'
 import webpack from 'webpack'
 import { getOptions, stringifyRequest } from 'loader-utils'
 import { loadModule } from '../lib/utils'
-import { LoaderType } from '../Plugin'
+import { requireModuleLoader } from '../lib/module'
+import { LibModuleLoader, LoaderType } from '../Plugin'
 
 type ReactLoader = webpack.loader.Loader & LoaderType
 type LoaderContext = webpack.loader.LoaderContext
+let libLoaderModule: any
 
-function getModuleCode(this: LoaderContext, resource: string, esModule: boolean) {
-  const request = stringifyRequest(this, resource)
-  const runtime = stringifyRequest(this, '@ices/react-locale')
-  return esModule
-    ? `
-    /** ${this.resourcePath} **/
-    import definitions from ${request}
-    import { withDefinitionsComponent, withDefinitionsHook, withDefinitionsContextHook } from ${runtime}
-    export * from ${runtime}
-    export const Trans = withDefinitionsComponent(definitions)
-    export const Translate = Trans
-    export const useTrans = withDefinitionsHook(definitions)
-    export const useTranslate = useTrans
-    export const useContextTrans = withDefinitionsContextHook(definitions)
-    export const useContextTranslate = useContextTrans
-    export { definitions, useTrans as default }
-  `
-    : `
-    /** ${this.resourcePath} **/
-    const definitions = require(${request})
-    const runtime = require(${runtime})
-    const { withDefinitionsComponent, withDefinitionsHook, withDefinitionsContextHook } = runtime
-    
-    Object.defineProperty(exports, '__esModule', { value: true });
-    
-    const Trans = withDefinitionsComponent(definitions)
-    const Translate = Trans
-    const useTrans = withDefinitionsHook(definitions)
-    const useTranslate = useTrans
-    const useContextTrans = withDefinitionsContextHook(definitions)
-    const useContextTranslate = useContextTrans
-    
-    exports.default = useTrans
-    exports.definitions = definitions
-    
-    exports.Trans = Trans
-    exports.Translate = Translate
-    exports.useTrans = useTrans
-    exports.useTranslate = useTranslate
-    exports.useContextTrans = useContextTrans
-    exports.useContextTranslate = useContextTranslate
-    
-    exports.withDefinitionsComponent = withDefinitionsComponent
-    exports.withDefinitionsHook = withDefinitionsHook
-    exports.withDefinitionsContextHook = withDefinitionsContextHook
-    
-    exports.withDefinitions = runtime.withDefinitions
-    exports.getLocale = runtime.getLocale
-    exports.setLocale = runtime.setLocale
-    exports.subscribe = runtime.subscribe
-    exports.plugins = runtime.plugins
-    exports.utils = runtime.utils
-  `
+/**
+ * 获取模块代码生成器。
+ */
+function getCodeGenerator(): LibModuleLoader['getModuleCode'] | never {
+  const libName = reactLoader.libModuleName as string
+  if (!libLoaderModule) {
+    const { loader } = requireModuleLoader([libName])[0]
+    libLoaderModule = loader
+  }
+  const generator = libLoaderModule.getModuleCode
+  if (typeof generator !== 'function') {
+    throw new Error(`Cannot get the loader interface named by getModuleCode from ${libName}`)
+  }
+  return generator
 }
 
 /**
@@ -67,17 +30,33 @@ function getModuleCode(this: LoaderContext, resource: string, esModule: boolean)
  */
 export const reactLoader: ReactLoader = function (this: LoaderContext) {
   const callback = this.async() || (() => {})
+  let generator: ReturnType<typeof getCodeGenerator>
+  try {
+    generator = getCodeGenerator()
+  } catch (err) {
+    callback(err)
+    return
+  }
+
   const { fileTypes, esModule } = getOptions(this)
   loadModule.call(
     this,
     `${fileTypes}&f=${path.relative(this.rootContext, this.resourcePath)}`,
-    (err, source, sourceMap, module) => {
-      if (err) {
-        callback(err)
-      } else {
-        const code = getModuleCode.call(this, module.resource, esModule as boolean)
-        callback(null, code, sourceMap)
+    (error, source, sourceMap, module) => {
+      if (!error) {
+        try {
+          const code = generator({
+            module: stringifyRequest(this, module.resource),
+            esModule: esModule as boolean,
+            resourcePath: this.resourcePath,
+          })
+          callback(null, code, sourceMap)
+          return
+        } catch (err) {
+          error = err
+        }
       }
+      callback(error instanceof Error ? error : new Error(`${error}`))
     }
   )
 }
@@ -85,4 +64,6 @@ export const reactLoader: ReactLoader = function (this: LoaderContext) {
 reactLoader.raw = true
 reactLoader.resourceQuery = /react/
 reactLoader.filepath = __filename
+reactLoader.libModuleName = '@ices/react-locale'
+
 export default reactLoader

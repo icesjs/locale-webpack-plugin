@@ -85,15 +85,3 @@ export const addLoaderBefore = (
   matcher: Function,
   newLoader: webpack.RuleSetRule
 ) => addLoader(config, matcher, newLoader, (x: number) => x)
-
-/**
- * 在匹配到的loader之后添加新的loader配置。
- * @param config
- * @param matcher
- * @param newLoader
- */
-export const addLoaderAfter = (
-  config: webpack.Configuration,
-  matcher: Function,
-  newLoader: webpack.RuleSetRule
-) => addLoader(config, matcher, newLoader, (x: number) => x + 1)

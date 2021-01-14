@@ -10,15 +10,13 @@ type LoaderContext = webpack.loader.LoaderContext
  * 将原始文件模块转发至模块转换loader。
  */
 const localeLoader: LocaleLoader = function (this: LoaderContext) {
-  const { componentTypes } = getOptions(this)
+  const { componentType } = getOptions(this)
   const callback = this.async() || (() => {})
-  loadModule.call(this, componentTypes as string, (err, source, sourceMap) => {
-    if (err) {
-      callback(err)
-    } else {
-      callback(null, source, sourceMap)
-    }
-  })
+  loadModule.call(this, componentType as string, (err, source, sourceMap) =>
+    err
+      ? callback(err instanceof Error ? err : new Error(`${err}`))
+      : callback(null, source, sourceMap)
+  )
 }
 
 localeLoader.raw = true

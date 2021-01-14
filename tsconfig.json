@@ -12,7 +12,6 @@
     "allowJs": false,
     "noUnusedLocals": true,
     "removeComments": true,
-    "inlineSources": true,
     "declaration": true,
     "declarationDir": "types",
     "outDir": "dist",
