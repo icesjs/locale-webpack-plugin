@@ -23,6 +23,7 @@ export function createDeclarations(
     writeFileSync(path.join(context, targetFile), codes.join(''))
     appendReferenceToLib(module, targetFile)
     ensureDependencies(module.name, packageModule.version)
+    appendReferenceToProject(module)
   }
 }
 
@@ -49,6 +50,24 @@ function ensureDependencies(moduleName: string, version: string) {
   }
 }
 
+// 追加引用声明到工程的types声明文件
+// 如果工程没有在代码里导入模块包，tsc不会去找已经在package.json里声明了的模块
+// 只有在代码里导入了模块，tsc才会根据依赖解析规则去找声明文件
+// 所以，这里还是需要把声明引用添加到工程的声明文件中去
+function appendReferenceToProject(module: ReturnType<typeof getModuleExports>[number]) {
+  const cwd = fs.realpathSync(process.cwd())
+  if (cwd === getSelfContext()) {
+    return
+  }
+  const { name } = module.packageModule
+  const typesPath = ensureFileHelper(['src/react-app-env.d.ts', 'src/types.d.ts'], cwd)
+  const refCode = `/// <reference types="${name}" />`
+  const content = fs.readFileSync(typesPath, 'utf8')
+  if (!new RegExp(`^\s*${escapeRegExpCharacters(refCode)}\s*$`, 'm').test(content)) {
+    writeFileSync(typesPath, `${refCode}\n${content}`)
+  }
+}
+
 // 追加引用声明到Lib的types声明文件
 function appendReferenceToLib(
   module: ReturnType<typeof getModuleExports>[number],
@@ -68,8 +87,11 @@ function appendReferenceToLib(
     writeFileSync(typesPath, `${refCode}\n${content}`)
   }
   // 同步types声明
-  packageModule.types = path.relative(context, typesPath).replace(/\\/g, '/')
-  writeFileSync(path.join(context, 'package.json'), JSON.stringify(packageModule, null, 2))
+  const newTypes = path.relative(context, typesPath).replace(/\\/g, '/')
+  if (newTypes !== packageModule.types) {
+    packageModule.types = newTypes
+    writeFileSync(path.join(context, 'package.json'), JSON.stringify(packageModule, null, 2))
+  }
 }
 
 // 检查文件路径列表，并确保存在至少一个文件（非目录）

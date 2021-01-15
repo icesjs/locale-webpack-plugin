@@ -63,7 +63,7 @@ function getDirectiveRegx() {
  * @param fileSystem 文件系统
  * @param file 文件路径
  */
-async function readFileAsync(fileSystem: typeof fs, file: string): Promise<FileNodeType> {
+async function readFileAsync(file: string, fileSystem: typeof fs = fs): Promise<FileNodeType> {
   const fileNode = { file, context: path.dirname(file), source: '' } as FileNodeType
   try {
     // 这里的文件系统可能由调用方传参，比如使用webpack的内存缓存文件系统
@@ -73,7 +73,7 @@ async function readFileAsync(fileSystem: typeof fs, file: string): Promise<FileN
     if (stats.isSymbolicLink()) {
       const realPath = fs.realpathSync(file)
       if (realPath !== file) {
-        return await readFileAsync(fileSystem, realPath)
+        return await readFileAsync(realPath, fileSystem)
       }
     }
     fileNode.isDir = stats.isDirectory()
@@ -96,13 +96,13 @@ async function readFileAsync(fileSystem: typeof fs, file: string): Promise<FileN
  * @param filePath 文件路径
  * @param fileSystem 文件系统
  */
-async function resolveFile(filePath: string, fileSystem: typeof fs | null) {
-  const fileNode = await readFileAsync(fileSystem || fs, filePath)
+async function resolveFile(filePath: string, fileSystem?: typeof fs) {
+  const fileNode = await readFileAsync(filePath, fileSystem)
   const { file, isDir, exists } = fileNode
   if (isDir) {
     for (const ext of resolveExtensions) {
       // 解析目录，以index[.ext]解析文件
-      const indexFileNode = await readFileAsync(fileSystem || fs, path.join(file, `index${ext}`))
+      const indexFileNode = await readFileAsync(path.join(file, `index${ext}`), fileSystem)
       const { exists, isDir } = indexFileNode
       if (exists && !isDir) {
         return indexFileNode
@@ -115,7 +115,7 @@ async function resolveFile(filePath: string, fileSystem: typeof fs | null) {
         continue
       }
       // 以附加后缀名解析
-      const extFileNode = await readFileAsync(fileSystem || fs, file + ext)
+      const extFileNode = await readFileAsync(file + ext, fileSystem)
       const { exists, isDir } = extFileNode
       if (exists && !isDir) {
         return extFileNode
@@ -137,7 +137,7 @@ async function parseDirective(
   fileNode: FileNodeType,
   parentFileNode: FileNodeType | null,
   resolvedFileMap: { [key: string]: FileNodeType },
-  fileSystem: typeof fs | null
+  fileSystem?: typeof fs
 ) {
   if (!fileNode.children) {
     fileNode.children = []
@@ -285,7 +285,10 @@ function serializeWarnings(fileNodeMaps: { [key: string]: FileNodeType }) {
     }
     warningsMap[file] = warnings
   }
-  return Object.values(warningsMap).flat()
+  return Object.values(warningsMap).reduce((array, item) => {
+    array.push(...item)
+    return array
+  }, [])
 }
 
 /**
@@ -320,7 +323,7 @@ function serializeFiles(fileNodes: FileNodeType[]) {
 export default async function parseIncludeAsync(
   content: string | Buffer,
   file: string,
-  fileSystem?: typeof fs | null
+  fileSystem?: typeof fs
 ) {
   if (Buffer.isBuffer(content)) {
     content = content.toString('utf8')
@@ -336,7 +339,7 @@ export default async function parseIncludeAsync(
     [file]: root,
   }
   try {
-    const fileNodes = await parseDirective(root, null, resolvedFileMap, fileSystem || fs)
+    const fileNodes = await parseDirective(root, null, resolvedFileMap, fileSystem)
     // 将结果按导入的顺序整理后返回
     return {
       files: serializeFiles(fileNodes.concat(root)),
