@@ -262,6 +262,11 @@ concat-map@0.0.1:
   resolved "https://registry.npm.taobao.org/concat-map/download/concat-map-0.0.1.tgz#d8a96bd77fd68df7793a73036a3ba0d5405d477b"
   integrity sha1-2Klr13/Wjfd5OnMDajug1UBdR3s=
 
+core-js@^3.6.4:
+  version "3.8.2"
+  resolved "https://registry.npm.taobao.org/core-js/download/core-js-3.8.2.tgz?cache=0&sync_timestamp=1609682022601&other_urls=https%3A%2F%2Fregistry.npm.taobao.org%2Fcore-js%2Fdownload%2Fcore-js-3.8.2.tgz#0a1fd6709246da9ca8eff5bb0cbd15fba9ac7044"
+  integrity sha1-Ch/WcJJG2pyo7/W7DL0V+6mscEQ=
+
 cosmiconfig@^7.0.0:
   version "7.0.0"
   resolved "https://registry.npm.taobao.org/cosmiconfig/download/cosmiconfig-7.0.0.tgz?cache=0&sync_timestamp=1596310773001&other_urls=https%3A%2F%2Fregistry.npm.taobao.org%2Fcosmiconfig%2Fdownload%2Fcosmiconfig-7.0.0.tgz#ef9b44d773959cae63ddecd122de23853b60f8d3"
@@ -900,6 +905,13 @@ to-regex-range@^5.0.1:
   integrity sha1-FkjESq58jZiKMmAY7XL1tN0DkuQ=
   dependencies:
     is-number "^7.0.0"
+
+ts-polyfill@^3.8.2:
+  version "3.8.2"
+  resolved "https://registry.npm.taobao.org/ts-polyfill/download/ts-polyfill-3.8.2.tgz#7375c6b6a4ae074af4f6200ff6c0d32dbbd113cb"
+  integrity sha1-c3XGtqSuB0r09iAP9sDTLbvRE8s=
+  dependencies:
+    core-js "^3.6.4"
 
 tslib@^1.9.0:
   version "1.14.1"
