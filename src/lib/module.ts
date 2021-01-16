@@ -2,31 +2,6 @@ import fs from 'fs'
 import path from 'path'
 import { escapeRegExpCharacters, getSelfContext } from './utils'
 
-/**
- * 创建资源模块的类型声明文件。
- * @param modules 可用于处理资源模块的Lib模块名。
- * @param fileTypes 支持的资源类型后缀名称。
- * @param targetFile 类型声明文件的路径名称（相对于Lib模块根目录）。
- */
-export function createDeclarations(
-  modules: string[],
-  fileTypes: string[],
-  targetFile = 'lib/locale.d.ts'
-) {
-  const moduleExports = getModuleExports(modules)
-  for (const module of moduleExports) {
-    const { exports, context, packageModule } = module
-    const codes = []
-    for (const type of fileTypes) {
-      codes.push(getResourceModuleCode(type, exports))
-    }
-    writeFileSync(path.join(context, targetFile), codes.join(''))
-    appendReferenceToLib(module, targetFile)
-    ensureDependencies(module.name, packageModule.version)
-    appendReferenceToProject(module)
-  }
-}
-
 // 确保模块依赖被正确声明
 function ensureDependencies(moduleName: string, version: string) {
   const pkgPath = path.resolve('package.json')
@@ -54,14 +29,13 @@ function ensureDependencies(moduleName: string, version: string) {
 // 如果工程没有在代码里导入模块包，tsc不会去找已经在package.json里声明了的模块
 // 只有在代码里导入了模块，tsc才会根据依赖解析规则去找声明文件
 // 所以，这里还是需要把声明引用添加到工程的声明文件中去
-function appendReferenceToProject(module: ReturnType<typeof getModuleExports>[number]) {
+function appendReferenceToProject(moduleName: string) {
   const cwd = fs.realpathSync(process.cwd())
   if (cwd === getSelfContext()) {
     return
   }
-  const { name } = module.packageModule
   const typesPath = ensureFileHelper(['src/react-app-env.d.ts', 'src/types.d.ts'], cwd)
-  const refCode = `/// <reference types="${name}" />`
+  const refCode = `/// <reference types="${moduleName}" />`
   const content = fs.readFileSync(typesPath, 'utf8')
   if (!new RegExp(`^\s*${escapeRegExpCharacters(refCode)}\s*$`, 'm').test(content)) {
     writeFileSync(typesPath, `${refCode}\n${content}`)
@@ -70,10 +44,10 @@ function appendReferenceToProject(module: ReturnType<typeof getModuleExports>[nu
 
 // 追加引用声明到Lib的types声明文件
 function appendReferenceToLib(
-  module: ReturnType<typeof getModuleExports>[number],
+  moduleDetails: ReturnType<typeof getModuleDetails>,
   declarationFile: string
 ) {
-  const { packageModule, context } = module
+  const { packageModule, context } = moduleDetails
   const { types, typings } = packageModule as { types: string; typings: string }
   // 查找声明文件
   const typesPath = ensureFileHelper([types, typings, 'index.d.ts'], context)
@@ -129,59 +103,17 @@ function writeFileSync(filePath: string, content: string) {
 }
 
 // 资源模块导出代码
-function getResourceModuleCode(type: string, exports: string) {
-  return '\n' + `declare module ${JSON.stringify(`*.${type}`)} {\n${exports}\n}\n`
+function getResourceModuleCode(ext: string, declarationExports: string) {
+  return (
+    '\n' +
+    `declare module ${JSON.stringify(
+      `*${ext.startsWith('.') ? '' : '.'}${ext}`
+    )} {\n${declarationExports.trim()}\n}\n`
+  )
 }
 
-// 获取模块的接口导出定义
-function getModuleExports(modules: string[]) {
-  const loaders = requireModuleLoader(modules)
-  const moduleExports = []
-  for (const loader of loaders) {
-    const {
-      name,
-      loader: { getModuleExports },
-    } = loader
-    if (typeof getModuleExports !== 'function') {
-      // 检查模块导出接口是否存在
-      throw new Error(`Can not find the export method named by getModuleExports for ${name}`)
-    }
-    const exports = getModuleExports({})
-    if (typeof exports !== 'string') {
-      throw new Error(`Module exports declaration of ${name} is not a string value`)
-    }
-    moduleExports.push({
-      ...loader,
-      exports,
-    })
-  }
-  return moduleExports
-}
-
-// 解析模块的loader路径
-export function requireModuleLoader(modules: string[]) {
-  const loaders = []
-  for (const name of modules) {
-    // 解析模块的包描述文件路径
-    const pkgPath = resolveModule(`${name}/package.json`)
-    const context = path.dirname(pkgPath)
-    const pkg = require(pkgPath)
-    const pkgLoader = ensureFileHelper([pkg.loader, 'loader.js', 'lib/loader.js'], context, false)
-    if (!pkgLoader) {
-      throw new Error(`Can not get loader of module ${name}`)
-    }
-    loaders.push({
-      name,
-      context,
-      loader: require(pkgLoader),
-      packageModule: pkg as { [p: string]: string },
-    })
-  }
-  return loaders
-}
-
-// 解析模块路径
-export function resolveModule(name: string) {
+// 解析模块包描述文件路径
+function resolveModulePackage(name: string) {
   const cwd = fs.realpathSync(process.cwd())
   const selfDir = getSelfContext()
   let pkgPath = ''
@@ -200,4 +132,59 @@ export function resolveModule(name: string) {
     }
   }
   return pkgPath
+}
+
+/**
+ * 获取Locale组件模块的详情
+ * @param name 模块名称
+ */
+export function getModuleDetails(name: string) {
+  // 解析模块的包描述文件路径
+  const pkgPath = resolveModulePackage(`${name}/package.json`)
+  const context = path.dirname(pkgPath)
+  const packageModule = require(pkgPath) as { [p: string]: string }
+  const loaderPath = ensureFileHelper(
+    [packageModule.loader, 'loader.js', 'lib/loader.js'],
+    context,
+    false
+  )
+  if (!loaderPath) {
+    throw new Error(`Can not get loader of module ${name}`)
+  }
+  return {
+    name,
+    context,
+    packageModule,
+    loaderModule: require(loaderPath),
+  }
+}
+
+/**
+ * 创建资源模块的类型声明文件。
+ * @param moduleDetails 可用于处理资源模块的Lib模块详情。
+ * @param extensions 支持的资源类型后缀名称。
+ * @param targetFile 类型声明文件的路径名称（相对于Lib模块根目录）。
+ */
+export function createDeclarations(
+  moduleDetails: ReturnType<typeof getModuleDetails>,
+  extensions: string[],
+  targetFile: string
+) {
+  const { loaderModule, packageModule, context, name } = moduleDetails
+  const { getModuleExports } = loaderModule
+  if (typeof getModuleExports !== 'function') {
+    throw new Error(`Can not find the export method named by getModuleExports for ${name}`)
+  }
+  const declarationExports = getModuleExports({})
+  if (typeof declarationExports !== 'string') {
+    throw new Error(`Module exports declaration of ${name} is not a string value`)
+  }
+  const declarationCodes = []
+  for (const ext of extensions) {
+    declarationCodes.push(getResourceModuleCode(ext, declarationExports))
+  }
+  writeFileSync(path.join(context, targetFile), declarationCodes.join(''))
+  appendReferenceToLib(moduleDetails, targetFile)
+  ensureDependencies(name, packageModule.version)
+  appendReferenceToProject(name)
 }

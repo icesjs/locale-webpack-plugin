@@ -1,30 +1,47 @@
 import webpack from 'webpack'
 import { addLoaderBefore, isTypeScriptProject } from './lib/utils'
-import reactLoader from './loader/reactLoader'
-import ymlLoader from './loader/ymlLoader'
+import { createDeclarations, getModuleDetails } from './lib/module'
 import localeLoader from './loader/localeLoader'
-import { createDeclarations, resolveModule } from './lib/module'
+import ymlLoader from './loader/ymlLoader'
 
-/**
- * 模块组件的类型。
- */
-enum ComponentType {
-  react = 'react',
-  // vue = 'vue',
+export interface LoaderType extends webpack.loader.Loader {
+  test?: RegExp
+  filepath: string
+  libName?: string
+  resourceQuery?: webpack.RuleSetCondition
+  extensions?: string[]
+  [key: string]: any
 }
 
-export interface PluginOptions {
+interface ComponentLoader {
+  getModuleCode(opts: { module: string; esModule: boolean; resourcePath: string }): string
+  getModuleExports(): string
+}
+
+export type LoaderOptions = {
+  esModule: boolean
+  extensions: string[]
+  generator: ComponentLoader['getModuleCode']
+}
+
+type PluginOptions = {
   /**
    * 语言定义文件的名称匹配正则表达式。
    * 用于对匹配到的文件进行模块化处理。
    * 默认匹配yml后缀格式文件。
    */
-  test?: RegExp
+  test?: RegExp | RegExp[]
   /**
    * 是否使用es模块导出代码。
    * 默认为 true。
    */
   esModule?: boolean
+  /**
+   * 需要使用的模块组件的类型。
+   * 目前可选值为 react ，暂不支持 vue 。
+   * 默认值为 react。
+   */
+  componentType?: ComponentType
   /**
    * 是否是 typescript 工程。
    * 默认为自动检测工程根目录下是否包含 tsconfig(.xxx)*.json
@@ -32,129 +49,115 @@ export interface PluginOptions {
    * 并且检查 typescript 依赖是否已经安装。
    * 是 typescript 工程会则创建资源模块的类型声明文件，以便提供代码智能提示和校验。
    * 可以手动指定为 typescript 工程，以强制创建类型声明文件。
-   * 类型声明文件放置在依赖包的目录下面( node_modules 里)，并不会给当前工程添加额外文件。
    */
   typescript?: boolean
-
-  /**
-   * 需要使用的模块组件的类型。
-   * 目前可选值为 react ，暂不支持 vue 。
-   * 默认根据安装的依赖包自动设置。
-   */
-  componentType?: ComponentType
 }
 
 /**
- * 组件库构建加载器接口定义。
+ * 使用的组件类型。
+ * 暂未提供vue组件。
  */
-export interface LibModuleLoader {
-  getModuleCode(opts: { module: string; esModule: boolean; resourcePath: string }): string
-  getModuleExports(): string
+enum ComponentType {
+  react = 'react',
+  vue = 'vue',
 }
 
-export type LoaderType = {
-  test?: RegExp
-  filepath: string
-  libModuleName?: string
-  resourceQuery?: webpack.RuleSetCondition
-}
+/**
+ * 用于加载解析语言定义文件至组件模块的webpack插件。
+ */
+export default class LocaleWebpackPlugin implements webpack.Plugin {
+  private readonly options: PluginOptions
+  private readonly fileLoaders: LoaderType[]
+  private readonly extensions: string[]
+  private readonly moduleGenerator: (opts: {
+    module: string
+    esModule: boolean
+    resourcePath: string
+  }) => string
 
-//
-class LocalePlugin implements webpack.Plugin {
-  constructor(readonly options: PluginOptions = {}) {
-    this.setComponentType()
-    this.setLibModule()
-    if (!this.componentType || !this.libModule) {
-      throw new Error(
-        'Can not find any package for generating code of locale module, you should install it first: ' +
-          reactLoader.libModuleName +
-          '\n'
-      )
-    }
-
-    // 生成资源模块类型声明文件
-    if (this.options.typescript || isTypeScriptProject()) {
-      createDeclarations([this.libModule], this.fileTypes)
+  constructor(options?: PluginOptions) {
+    this.fileLoaders = [ymlLoader]
+    this.options = Object.assign(
+      {
+        test: this.fileLoaders.map(({ test }) => test),
+        componentType: ComponentType.react,
+        esModule: true,
+      },
+      options
+    )
+    const { componentType, typescript } = this.options
+    const moduleDetails = this.getLibModuleDetails(componentType)
+    this.moduleGenerator = this.getModuleGenerator(moduleDetails)
+    this.extensions = this.getSupportedExtensions()
+    if (typeof typescript === 'boolean' ? typescript : isTypeScriptProject()) {
+      createDeclarations(moduleDetails, this.extensions, 'lib/locale.d.ts')
     }
   }
 
-  // 当前已经支持解析的语言定义文件格式
-  private fileTypes = ['yml', 'yaml']
-  // 当前使用的资源模块组件类型
-  private componentType: ComponentType = ComponentType.react
-  // 处理资源模块内容的Lib模块依赖，用来声明类型定义文件，以及资源模块代码
-  private libModule = reactLoader.libModuleName as string
+  getLibModuleDetails(componentType?: ComponentType) {
+    let moduleDetails: ReturnType<typeof getModuleDetails> | null = null
+    switch (componentType) {
+      case ComponentType.react:
+        moduleDetails = getModuleDetails('@ices/react-locale')
+        break
+      case ComponentType.vue:
+        // exports = getModuleExports(['@ices/vue-locale'])
+        break
+    }
+    if (!moduleDetails) {
+      throw new Error(`There is no corresponding component loader for ${componentType}`)
+    }
+    return moduleDetails
+  }
 
-  /**
-   * 设置模块组件类型。
-   */
-  setComponentType() {
-    const { componentType } = this.options
-    if (componentType) {
-      this.componentType = componentType
-    } else {
-      try {
-        if (resolveModule(reactLoader.libModuleName as string)) {
-          this.componentType = ComponentType.react
-        } else {
-          // vue 暂未支持
+  getModuleGenerator({ loaderModule, name }: { loaderModule: ComponentLoader; name: string }) {
+    const { getModuleCode } = loaderModule
+    if (typeof getModuleCode !== 'function') {
+      throw new Error(`There is no corresponding code generator (${name})`)
+    }
+    return getModuleCode
+  }
+
+  getSupportedExtensions() {
+    const extSet = new Set<string>()
+    for (const { extensions } of this.fileLoaders) {
+      if (Array.isArray(extensions)) {
+        for (const ext of extensions) {
+          extSet.add(ext.replace(/^\./, ''))
         }
-      } catch (e) {}
+      }
     }
+    return [...extSet]
   }
 
-  /**
-   * 设置处理模块资源的依赖包。
-   */
-  setLibModule() {
-    if (this.componentType === ComponentType.react) {
-      this.libModule = reactLoader.libModuleName as string
-    } else {
-      // vue 暂未支持
-    }
-  }
-
-  /**
-   * 应用webpack插件。
-   * @param compiler
-   */
-  apply(compiler: webpack.Compiler) {
-    const { componentType } = this
-    const { test = /\.ya?ml$/ } = this.options
-    const { options = {} } = compiler
-    const rule = {
-      // 默认对yml格式文件进行解析
-      test,
-      enforce: 'pre' as 'pre',
-      oneOf: [
-        componentType === ComponentType.react && this.getLoaderRule(reactLoader),
-        this.getLoaderRule(ymlLoader),
-        this.getLoaderRule(localeLoader),
-      ].filter(Boolean) as webpack.RuleSetRule[],
-    }
-    addLoaderBefore(options, rule, ['file-loader', 'url-loader'])
-  }
-
-  /**
-   * 获取规则定义。
-   * @param filepath
-   * @param test
-   * @param resourceQuery
-   */
   getLoaderRule({ filepath, test, resourceQuery }: LoaderType): webpack.RuleSetRule {
-    const { fileTypes, componentType } = this
-    const { esModule = true } = this.options
+    const {
+      options: { esModule },
+      extensions,
+      moduleGenerator,
+    } = this
+    //
     return {
       test,
       resourceQuery,
       loader: filepath,
       options: {
         esModule,
-        fileTypes: fileTypes.join('&'),
-        componentType: componentType,
+        extensions,
+        generator: moduleGenerator,
       },
     }
   }
-}
 
-export default LocalePlugin
+  apply(compiler: webpack.Compiler) {
+    const rule = {
+      test: this.options.test,
+      enforce: 'pre' as 'pre',
+      oneOf: [
+        ...this.fileLoaders.map((loader) => this.getLoaderRule(loader)),
+        this.getLoaderRule(localeLoader),
+      ],
+    }
+    addLoaderBefore(compiler.options, rule, ['file-loader', 'url-loader'])
+  }
+}

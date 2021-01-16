@@ -1,2 +1,2 @@
-import LocalePlugin from './Plugin'
-export = LocalePlugin
+import LocaleWebpackPlugin from './Plugin'
+export = LocaleWebpackPlugin

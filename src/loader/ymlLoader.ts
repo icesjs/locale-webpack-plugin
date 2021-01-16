@@ -1,11 +1,10 @@
 import fs from 'fs'
 import webpack from 'webpack'
 import loaderUtils from 'loader-utils'
-import { LoaderType } from '../Plugin'
 import parseIncludeAsync from '../lib/include'
 import loadResources from '../lib/resource'
+import { LoaderOptions, LoaderType } from '../Plugin'
 
-type YmlLoader = webpack.loader.Loader & LoaderType
 type LoaderContext = webpack.loader.LoaderContext
 
 async function loadLocales(this: LoaderContext, source: string) {
@@ -37,19 +36,22 @@ async function loadLocales(this: LoaderContext, source: string) {
 /**
  * 解析yml格式的语言定义文件。
  */
-const ymlLoader: YmlLoader = function (this: LoaderContext, source: string | Buffer) {
-  const { esModule } = loaderUtils.getOptions(this)
+const ymlLoader: LoaderType = function (this: LoaderContext, source: string | Buffer) {
+  const options: any = loaderUtils.getOptions(this)
+  const { esModule } = options as LoaderOptions
   const callback = this.async() || (() => {})
   //
   loadLocales
     .call(this, source as string)
-    .then((content) => {
-      const code = `${esModule ? 'export default ' : 'module.exports='}${JSON.stringify(content)}`
-      callback(null, code)
-    })
-    .catch((err) => callback(err instanceof Error ? err : new Error(`${err}`)))
+    .then(
+      (content) => `${esModule ? 'export default ' : 'module.exports='}${JSON.stringify(content)}`
+    )
+    .then((code) => callback(null, code))
+    .catch(callback)
 }
 
+ymlLoader.test = /\.ya?ml$/
 ymlLoader.resourceQuery = /ya?ml/
 ymlLoader.filepath = __filename
+ymlLoader.extensions = ['.yml', '.yaml']
 export default ymlLoader
