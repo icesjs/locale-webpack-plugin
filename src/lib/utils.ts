@@ -37,9 +37,7 @@ export function loadModule(
   resourceQuery: string,
   callback: (err: any, source: any, sourceMap: any, module: any) => any
 ) {
-  const request = `./${path
-    .relative(this.context, this.resourcePath)
-    .replace(/^\.[/\\]/g, '')}?${resourceQuery}`
+  const request = `${normalizePath(this.resourcePath, this.context)}?${resourceQuery}`
   return this.loadModule(request, callback)
 }
 
@@ -90,4 +88,61 @@ export function getSelfContext() {
  */
 export function escapeRegExpCharacters(str: string): string {
   return str.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&').replace(/-/g, '\\x2d')
+}
+
+/**
+ * 首字母大写。
+ * @param str 待处理的字符串。
+ */
+export function capitalize(str: string) {
+  return str[0].toUpperCase() + str.substr(1)
+}
+
+/**
+ * 获取一个变量标识符生成器。
+ * @param prefix 标识符前缀。
+ * @param counter 用于同名变量计数的容器。
+ */
+export function getIdentifierMaker(prefix = '', counter: { [p: string]: number } = {}) {
+  return (namespace = 'space') => {
+    const identifier =
+      `${prefix}${capitalize(
+        namespace !== '/' ? namespace.replace(/[/\\](.)/g, ($0, $1) => $1.toUpperCase()) : 'glob'
+      )}}`.replace(/[^_a-z$\d]/gi, '') || 'ident'
+    const count = counter[identifier] || 0
+    counter[identifier] = count + 1
+    return `${identifier}${count || ''}`
+  }
+}
+
+/**
+ * 格式化路径。
+ * @param filepath 文件路径
+ * @param base 相对于该路径
+ */
+export function normalizePath(filepath: string, base?: string) {
+  if (base) {
+    filepath = path.relative(base, filepath)
+  }
+  filepath = filepath.replace(/\\/g, '/')
+  if (base && !filepath.startsWith('.')) {
+    filepath = './' + filepath
+  }
+  return filepath
+}
+
+/**
+ * 判断两个路径是不是指向同一个文件
+ * @param a a路径
+ * @param b b路径
+ * @param base 相对于该路径
+ */
+export function isSamePath(a: string, b: string, base: string = process.cwd()) {
+  if (!path.isAbsolute(a)) {
+    a = path.join(base, a)
+  }
+  if (!path.isAbsolute(b)) {
+    b = path.join(base, b)
+  }
+  return a === b
 }

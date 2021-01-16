@@ -1,7 +1,10 @@
+import fs from 'fs'
 import webpack from 'webpack'
 import loaderUtils from 'loader-utils'
-import { loadModule } from '../lib/utils'
+import { loadModule, normalizePath } from '../lib/utils'
 import { LoaderOptions, LoaderType } from '../Plugin'
+
+const cwd = fs.realpathSync(process.cwd())
 
 type LoaderContext = webpack.loader.LoaderContext
 
@@ -17,7 +20,7 @@ const localeLoader: LoaderType = function (this: LoaderContext) {
       if (!error) {
         code = generator({
           esModule,
-          resourcePath: this.resourcePath,
+          resourcePath: normalizePath(this.resourcePath, cwd),
           module: loaderUtils.stringifyRequest(this, module.resource),
         })
       }
@@ -33,6 +36,7 @@ const localeLoader: LoaderType = function (this: LoaderContext) {
   })
 }
 
-localeLoader.raw = true
+export const raw = true
+localeLoader.raw = raw
 localeLoader.filepath = __filename
 export default localeLoader

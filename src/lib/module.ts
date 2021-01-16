@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import { escapeRegExpCharacters, getSelfContext } from './utils'
+import { escapeRegExpCharacters, getSelfContext, isSamePath, normalizePath } from './utils'
 
 // 确保模块依赖被正确声明
 function ensureDependencies(moduleName: string, version: string) {
@@ -52,18 +52,15 @@ function appendReferenceToLib(
   // 查找声明文件
   const typesPath = ensureFileHelper([types, typings, 'index.d.ts'], context)
   // 追加资源模块声明引用
-  const refPath = path
-    .relative(path.dirname(typesPath), path.join(context, declarationFile))
-    .replace(/\\/g, '/')
-  const refCode = `/// <reference path="${refPath.startsWith('.') ? '' : './'}${refPath}" />`
+  const refPath = normalizePath(path.join(context, declarationFile), path.dirname(typesPath))
+  const refCode = `/// <reference path="${refPath}" />`
   const content = fs.readFileSync(typesPath, 'utf8')
   if (!new RegExp(`^\s*${escapeRegExpCharacters(refCode)}\s*$`, 'm').test(content)) {
     writeFileSync(typesPath, `${refCode}\n${content}`)
   }
   // 同步types声明
-  const newTypes = path.relative(context, typesPath).replace(/\\/g, '/')
-  if (newTypes !== packageModule.types) {
-    packageModule.types = newTypes
+  if (!isSamePath(typesPath, packageModule.types, context)) {
+    packageModule.types = normalizePath(typesPath, context)
     writeFileSync(path.join(context, 'package.json'), JSON.stringify(packageModule, null, 2))
   }
 }
@@ -108,7 +105,7 @@ function getResourceModuleCode(ext: string, declarationExports: string) {
     '\n' +
     `declare module ${JSON.stringify(
       `*${ext.startsWith('.') ? '' : '.'}${ext}`
-    )} {\n${declarationExports.trim()}\n}\n`
+    )} {\n${declarationExports}\n}\n`
   )
 }
 

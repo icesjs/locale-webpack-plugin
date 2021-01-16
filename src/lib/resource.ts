@@ -9,14 +9,14 @@
  * }
  */
 
+import fs from 'fs'
 import path from 'path'
 import yaml from 'js-yaml'
-
-type DataType = string | number | boolean | object | null | undefined
-type ParsedDataType = Exclude<DataType, undefined>
+import { normalizePath } from './utils'
+import { DataType, ParsedDataType } from './merge'
 type LoadResult = { data: ParsedDataType; warnings: Warning[] }
-type LocaleData = { [key: string]: Exclude<ParsedDataType, object> }
-type LocaleDataSet = { [locale: string]: LocaleData }
+
+const cwd = fs.realpathSync(process.cwd())
 
 /**
  * 用于去除警告信息的堆栈内容。
@@ -71,80 +71,61 @@ function getFileLocaleName(file: string) {
 }
 
 /**
- * 合并本地化数据
- * @param dataSet 本地化数据集
+ * 检查非键值对数据时，消息内容是否有效。
  * @param locale 区域语言代码
- * @param data 待合并的数据
- */
-function mergeLocaleData(dataSet: LocaleDataSet, locale: string, data: LocaleData) {
-  let localeData: LocaleData = dataSet[locale]
-  if (!localeData) {
-    dataSet[locale] = localeData = {}
-  }
-  for (const [key, val] of Object.entries(data)) {
-    localeData[key] = val
-  }
-}
-
-/**
- * 合并本地化消息对象
- * @param dataSet 本地化数据集
- * @param locale 区域语言代码
- * @param data 待合并的消息对象
+ * @param data 待检查的数据对象
  * @param file
  */
-function mergeLocaleObject(dataSet: LocaleDataSet, locale: string, data: object, file: string) {
+function checkObject(locale: string, data: object, file: string) {
   const warnings: Warning[] = []
-  const localeData: LocaleData = {}
   for (const entry of Object.entries(data)) {
     const [key, val] = entry as [string, ParsedDataType]
     if (val !== null && typeof val === 'object') {
-      localeData[key] = ''
       warnings.push(
-        new Warning(`Localized message content cannot be an object: [${locale}: ${key}] ${file}`)
+        new Warning(
+          `Localized message content cannot be an object: [${locale}: ${key}] ${normalizePath(
+            file,
+            cwd
+          )}`
+        )
       )
-    } else {
-      localeData[key] = val
     }
   }
-  mergeLocaleData(dataSet, locale, localeData)
   return warnings
 }
 
 /**
- * 合并解析数据
- * @param dataSet 本地化内容数据集
- * @param data 带合并的已解析数据
- * @param file 数据来源文件的路径
+ * 检查数据是否有效，并给出警告提示。
+ * @param data 待合并的已解析数据。
+ * @param file 数据来源文件的路径。
  */
-function merge(dataSet: LocaleDataSet, data: LoadResult['data'], file: string) {
+function check(data: LoadResult['data'], file: string) {
   const warnings: Warning[] = []
   if (data === null || typeof data !== 'object') {
     if (data !== null) {
-      warnings.push(new Warning(`Localized data must be defined as an object: ${file}`))
+      warnings.push(
+        new Warning(`Localized data must be defined as an object: ${normalizePath(file, cwd)}`)
+      )
     }
   } else {
+    let containsKVPairs = false
     let containsObject = false
-    const localeData: LocaleData = {}
     for (const entry of Object.entries(data)) {
       const [key, val] = entry as [string, ParsedDataType]
       if (val === null || typeof val !== 'object') {
-        localeData[key] = val
+        containsKVPairs = true
         continue
       }
       containsObject = true
-      // 对象优先合并进 localeDataSet
-      warnings.push(...mergeLocaleObject(dataSet, key, val, file))
-    }
-    const containsKVPairs = !!Object.keys(localeData).length
-    if (containsKVPairs) {
-      // 以文件名作为locale代码
-      mergeLocaleData(dataSet, getFileLocaleName(file), localeData)
+      warnings.push(...checkObject(key, val, file))
     }
     if (containsObject && containsKVPairs) {
       warnings.push(
         new Warning(
-          `It is better not to mix objects and common key value pairs in the same file to define localized message content: ${file}`
+          `It is better not to mix objects and common key value pairs in the same file to define localized message content: ${normalizePath(
+            file,
+            cwd
+          )}`
         )
       )
     }
@@ -155,18 +136,17 @@ function merge(dataSet: LocaleDataSet, data: LoadResult['data'], file: string) {
 
 /**
  * 解析加载本地化消息内容。
- * @param fileList 待解析的文件列表
+ * @param source 文件内容。
+ * @param file 文件路径。
  */
-export default function loadResources(fileList: { file: string; source: string }[]) {
+export default function loadResource(source: string, file: string) {
   const warningList = []
-  const dataSet: LocaleDataSet = {}
-  for (const { source, file } of fileList) {
-    const { warnings, data } = loadFile(source, path.extname(file))
-    warningList.push(...warnings)
-    warningList.push(...merge(dataSet, data, file))
-  }
+  const { warnings, data } = loadFile(source, path.extname(file))
+  warningList.push(...warnings)
+  warningList.push(...check(data, file))
   return {
+    locale: getFileLocaleName(file),
     warnings: warningList,
-    data: dataSet,
+    data,
   }
 }

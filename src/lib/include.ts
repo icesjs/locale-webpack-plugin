@@ -16,6 +16,7 @@
 
 import fs from 'fs'
 import path from 'path'
+import { normalizePath } from './utils'
 
 // 匹配指令声明的正则表达式
 // 0号元素为指令 分组1为引号、分组2为contextPath、分组3为modulePath
@@ -60,8 +61,8 @@ function getDirectiveRegx() {
 
 /**
  * 读取文件内容。
- * @param fileSystem 文件系统
  * @param file 文件路径
+ * @param fileSystem 文件系统
  */
 async function readFileAsync(file: string, fileSystem: typeof fs = fs): Promise<FileNodeType> {
   const fileNode = { file, context: path.dirname(file), source: '' } as FileNodeType
@@ -216,10 +217,10 @@ async function parseDirective(
  */
 function printFilePath(fileNode: FileNodeType, parentFileNode: FileNodeType | null) {
   const { file } = fileNode
-  const filePath = path.relative(cwd, file).replace(/\\/g, '/')
+  const filePath = normalizePath(file, cwd)
   let includedBy
   if (parentFileNode) {
-    const parentPath = path.relative(cwd, parentFileNode.file).replace(/\\/g, '/')
+    const parentPath = normalizePath(parentFileNode.file, cwd)
     includedBy = ` (included by: ${parentPath})`
   } else {
     includedBy = ''
@@ -315,41 +316,27 @@ function serializeFiles(fileNodes: FileNodeType[]) {
 }
 
 /**
- * 解析yml文件内容导入指令。
- * @param content 文件内容。
- * @param file 当前解析文件的路径名称。
+ * 解析yml文件导入指令。
+ * @param file 待解析文件的路径。
  * @param fileSystem webpack可缓存的文件系统。
  */
-export default async function parseIncludeAsync(
-  content: string | Buffer,
-  file: string,
-  fileSystem?: typeof fs
-) {
-  if (Buffer.isBuffer(content)) {
-    content = content.toString('utf8')
-  }
-  const root = {
-    file,
-    source: content,
-    context: path.dirname(file),
-    exists: true,
-    isDir: false,
-  }
+export default async function parseIncludeAsync(file: string, fileSystem?: typeof fs) {
+  const fileNode = await readFileAsync(file, fileSystem)
   const resolvedFileMap = {
-    [file]: root,
+    [fileNode.file]: fileNode,
   }
   try {
-    const fileNodes = await parseDirective(root, null, resolvedFileMap, fileSystem)
+    const fileNodes = await parseDirective(fileNode, null, resolvedFileMap, fileSystem)
     // 将结果按导入的顺序整理后返回
     return {
-      files: serializeFiles(fileNodes.concat(root)),
+      files: serializeFiles(fileNodes.concat(fileNode)),
       warnings: serializeWarnings(resolvedFileMap),
       error: null,
     }
   } catch (error) {
     // 将已解析的文件列表返回，因为需要添加依赖信息，好在文件更新时，触发重新构建
     return {
-      files: serializeFiles(Object.values(resolvedFileMap).concat(root) as FileNodeType[]),
+      files: serializeFiles(Object.values(resolvedFileMap).concat(fileNode) as FileNodeType[]),
       warnings: serializeWarnings(resolvedFileMap),
       error,
     }
