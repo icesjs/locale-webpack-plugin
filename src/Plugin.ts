@@ -1,6 +1,7 @@
 import webpack from 'webpack'
 import { addLoaderBefore, isTypeScriptProject } from './lib/utils'
 import { createDeclarations, getModuleDetails } from './lib/module'
+import extractLoader from './loader/extractLoader'
 import localeLoader from './loader/localeLoader'
 import ymlLoader from './loader/ymlLoader'
 
@@ -13,13 +14,21 @@ export interface LoaderType extends webpack.loader.Loader {
   [key: string]: any
 }
 
+type ModuleGeneratorOptions = {
+  module: string
+  esModule: boolean
+  resourcePath: string
+  rootContext: string
+}
+
 interface ComponentLoader {
-  getModuleCode(opts: { module: string; esModule: boolean; resourcePath: string }): string
+  getModuleCode(opts: ModuleGeneratorOptions): string
   getModuleExports(): string
 }
 
 export type LoaderOptions = {
   esModule: boolean
+  extract: boolean
   extensions: string[]
   generator: ComponentLoader['getModuleCode']
 }
@@ -51,6 +60,12 @@ type PluginOptions = {
    * 可以手动指定为 typescript 工程，以强制创建类型声明文件。
    */
   typescript?: boolean
+
+  /**
+   * 是否将语言定义文件抽取成单独的文件发布。
+   * 默认根据运行环境自动设值。
+   */
+  extract?: boolean
 }
 
 /**
@@ -69,11 +84,7 @@ export default class LocaleWebpackPlugin implements webpack.Plugin {
   private readonly options: PluginOptions
   private readonly fileLoaders: LoaderType[]
   private readonly extensions: string[]
-  private readonly moduleGenerator: (opts: {
-    module: string
-    esModule: boolean
-    resourcePath: string
-  }) => string
+  private readonly moduleGenerator: (opts: ModuleGeneratorOptions) => string
 
   constructor(options?: PluginOptions) {
     this.fileLoaders = [ymlLoader]
@@ -130,34 +141,56 @@ export default class LocaleWebpackPlugin implements webpack.Plugin {
     return [...extSet]
   }
 
-  getLoaderRule({ filepath, test, resourceQuery }: LoaderType): webpack.RuleSetRule {
+  getLoaderRule({ filepath, test, resourceQuery }: LoaderType, extractLocales?: boolean) {
     const {
       options: { esModule },
       extensions,
       moduleGenerator,
     } = this
-    //
-    return {
-      test,
-      resourceQuery,
-      loader: filepath,
-      options: {
-        esModule,
-        extensions,
-        generator: moduleGenerator,
-      },
+    const options = {
+      esModule,
+      extensions,
+      extract: extractLocales,
+      generator: moduleGenerator,
     }
+    const rule: webpack.RuleSetRule = { test, resourceQuery }
+    if (extractLocales) {
+      rule.use = [
+        { loader: extractLoader.filepath, options },
+        { loader: filepath, options },
+      ]
+    } else {
+      rule.loader = filepath
+      rule.options = options
+    }
+    //
+    return rule
   }
 
   apply(compiler: webpack.Compiler) {
+    const { test, extract } = this.options
+    const { options: compilerOptions } = compiler
+    const { mode, target } = compilerOptions
+
+    let shouldExtract: any = extract
+    if (typeof shouldExtract !== 'boolean') {
+      if (target !== 'web') {
+        shouldExtract = false
+      } else {
+        shouldExtract = mode === 'production' || process.env.NODE_ENV === 'production'
+      }
+    }
+
     const rule = {
-      test: this.options.test,
+      test,
       enforce: 'pre' as 'pre',
-      oneOf: [
-        ...this.fileLoaders.map((loader) => this.getLoaderRule(loader)),
+      rules: [
         this.getLoaderRule(localeLoader),
+        {
+          oneOf: this.fileLoaders.map((loader) => this.getLoaderRule(loader, shouldExtract)),
+        },
       ],
     }
-    addLoaderBefore(compiler.options, rule, ['file-loader', 'url-loader'])
+    addLoaderBefore(compilerOptions, rule, ['file-loader', 'url-loader'])
   }
 }

@@ -28,20 +28,6 @@ export function addLoaderBefore(
 }
 
 /**
- * 加载一个模块资源。
- * @param resourceQuery
- * @param callback
- */
-export function loadModule(
-  this: webpack.loader.LoaderContext,
-  resourceQuery: string,
-  callback: (err: any, source: any, sourceMap: any, module: any) => any
-) {
-  const request = `${normalizePath(this.resourcePath, this.context)}?${resourceQuery}`
-  return this.loadModule(request, callback)
-}
-
-/**
  * 简单判断当前的工程，是不是一个typescript工程。
  */
 export function isTypeScriptProject() {

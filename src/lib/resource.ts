@@ -139,7 +139,10 @@ function check(data: LoadResult['data'], file: string) {
  * @param source 文件内容。
  * @param file 文件路径。
  */
-export default function loadResource(source: string, file: string) {
+export default function loadResource(source: string | Buffer, file: string) {
+  if (Buffer.isBuffer(source)) {
+    source = source.toString('utf8')
+  }
   const warningList = []
   const { warnings, data } = loadFile(source, path.extname(file))
   warningList.push(...warnings)

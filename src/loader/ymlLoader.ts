@@ -18,9 +18,6 @@ const runtime = path.join(__dirname, '../lib/merge')
  * 加载单个模块资源。
  */
 function loadData(this: LoaderContext, source: string | Buffer) {
-  if (Buffer.isBuffer(source)) {
-    source = source.toString('utf8')
-  }
   const { warnings, locale, data } = loadResource(source, this.resourcePath)
   for (const warn of warnings) {
     this.emitWarning(warn)
@@ -31,13 +28,11 @@ function loadData(this: LoaderContext, source: string | Buffer) {
 /**
  * 生成仅单个静态模块时的模块代码。
  */
-function getStaticModuleCode(
-  this: LoaderContext,
-  data: ReturnType<typeof loadData>,
-  esModule: boolean
-) {
-  // 这里使用 merge 对数据进行格式化
-  const dataSet = merge([data])
+function getStaticModuleCode(this: LoaderContext, source: string | Buffer, options: LoaderOptions) {
+  const { esModule, extract } = options
+  // 如果已经抽取模块，则不进行数据加载，由抽取层动态去加载数据，提升丁点性能
+  // 非抽取时，使用 merge 对数据进行格式化
+  const dataSet = extract ? {} : merge([loadData.call(this, source)])
   const exports = JSON.stringify(dataSet)
   return `/** ${normalizePath(this.resourcePath, cwd)} **/\n${
     esModule ? 'export default ' : 'module.exports = '
@@ -51,9 +46,9 @@ function getStaticModuleCode(
 function getImportModuleCode(
   this: LoaderContext,
   files: { file: string; source: string }[],
-  extensions: string[],
-  esModule: boolean
+  options: LoaderOptions
 ) {
+  const { extensions, esModule } = options
   const getIdent = getIdentifierMaker('loc')
   const query = extensions.join('&')
   const identifiers = []
@@ -62,9 +57,7 @@ function getImportModuleCode(
   const def = getIdent('def')
   if (!esModule) {
     // es导出兼容
-    codeSnippets.push(
-      `function ${def}(e){return e && typeof e === 'object' && 'default' in e ? e : { 'default': e }}`
-    )
+    codeSnippets.push(`function ${def}(e){return e && e.__esModule ? e.default : e}`)
   }
 
   // 当前模块自身
@@ -76,7 +69,7 @@ function getImportModuleCode(
     if (esModule) {
       codeSnippets.push(`import ${id} from ${req}`)
     } else {
-      codeSnippets.push(`const ${id} = ${def}(require(${req})).default`)
+      codeSnippets.push(`const ${id} = ${def}(require(${req}))`)
     }
     identifiers.push(id)
   }
@@ -109,8 +102,10 @@ function getImportModuleCode(
  */
 export const pitch = function (this: LoaderContext) {
   const options: any = getOptions(this)
-  const { esModule, extensions } = options as LoaderOptions
+  this.sourceMap = false
+  this.cacheable(true)
   const callback = this.async() || (() => {})
+
   // 处理包含导入情况
   parseIncludeAsync(this.resourcePath, this.fs as typeof fs)
     // 如果包含include进来的模块，则导入该模块
@@ -127,8 +122,8 @@ export const pitch = function (this: LoaderContext) {
       if (error) {
         callback(error)
       } else if (files.length > 1) {
-        // 生成模块导入代码，并跳过常规 loader
-        callback(null, getImportModuleCode.call(this, files, extensions, esModule))
+        // 生成模块导入代码
+        callback(null, getImportModuleCode.call(this, files, options as LoaderOptions))
       } else {
         // 由 loader 常规处理
         callback(null)
@@ -141,13 +136,10 @@ export const pitch = function (this: LoaderContext) {
  */
 const ymlLoader: LoaderType = function (this: LoaderContext, source: string | Buffer) {
   const options: any = getOptions(this)
-  const { esModule } = options as LoaderOptions
   // 需要重设依赖，因为可能从有导入子模块变成了不导入
   this.clearDependencies()
   this.addDependency(this.resourcePath)
-  // 处理单个的资源模块
-  const data = loadData.call(this, source)
-  return getStaticModuleCode.call(this, data, esModule)
+  return getStaticModuleCode.call(this, source, options as LoaderOptions)
 }
 
 ymlLoader.pitch = pitch
