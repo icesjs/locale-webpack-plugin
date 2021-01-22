@@ -102,7 +102,6 @@ function getImportModuleCode(
  */
 export const pitch = function (this: LoaderContext) {
   const options: any = getOptions(this)
-  this.sourceMap = false
   this.cacheable(true)
   const callback = this.async() || (() => {})
 
@@ -122,8 +121,12 @@ export const pitch = function (this: LoaderContext) {
       if (error) {
         callback(error)
       } else if (files.length > 1) {
-        // 生成模块导入代码
-        callback(null, getImportModuleCode.call(this, files, options as LoaderOptions))
+        try {
+          // 生成模块导入代码
+          callback(null, getImportModuleCode.call(this, files, options as LoaderOptions))
+        } catch (err) {
+          callback(err)
+        }
       } else {
         // 由 loader 常规处理
         callback(null)
@@ -139,7 +142,11 @@ const ymlLoader: LoaderType = function (this: LoaderContext, source: string | Bu
   // 需要重设依赖，因为可能从有导入子模块变成了不导入
   this.clearDependencies()
   this.addDependency(this.resourcePath)
-  return getStaticModuleCode.call(this, source, options as LoaderOptions)
+  try {
+    this.callback(null, getStaticModuleCode.call(this, source, options as LoaderOptions))
+  } catch (err) {
+    this.callback(err)
+  }
 }
 
 ymlLoader.pitch = pitch

@@ -15,17 +15,14 @@ export const pitch = function (this: LoaderContext) {
     return
   }
 
-  this.sourceMap = false
   this.cacheable(true)
   const callback = this.async() || (() => {})
   const request = urlToRequest(this.resourcePath + query)
 
-  this.loadModule(request, (err, source, sourceMap, module) => {
+  this.loadModule(request, (err) => {
     if (err) {
       callback(err)
     } else {
-      // @ts-ignored
-      module.isLocaleModule = true
       try {
         callback(
           null,

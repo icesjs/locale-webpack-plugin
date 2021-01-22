@@ -66,6 +66,8 @@ function evalModuleCode(this: LoaderContext, code: string) {
         return require(file)
       }
       dependencies.add(file)
+      // 模块内容由内部插件生成，所以是确定的
+      // 这里只需要进行数据解析加载即可
       return loadData.call(this, file)
     },
   })
@@ -80,7 +82,7 @@ function evalModuleCode(this: LoaderContext, code: string) {
   }
 }
 
-function getModuleCode(this: LoaderContext, source: string, options: LoaderOptions) {
+async function getModuleCode(this: LoaderContext, source: string, options: LoaderOptions) {
   const { exports, dependencies } = evalModuleCode.call(this, source)
   const { resourcePath } = this
 
@@ -90,26 +92,35 @@ function getModuleCode(this: LoaderContext, source: string, options: LoaderOptio
     this.addDependency(deps)
   }
 
-  const { esModule } = options
-  const hash = getHashDigest(Buffer.from(resourcePath), 'sha1', 'hex', 6)
+  const { extractor } = options
+  const namespace = getHashDigest(
+    // 开发模式时，命名空间绑定至资源路径，否则热更新时，会存在问题
+    // 产品模式时，命名空间绑定至数据内容，可以进行重复内容的去重
+    Buffer.from(process.env.NODE_ENV === 'development' ? resourcePath : JSON.stringify(exports)),
+    'md4',
+    'hex',
+    6
+  )
+
+  const code = await extractor!.extract(exports, namespace)
   return `
-    /** ${normalizePath(resourcePath, cwd)} **/
-    ${esModule ? 'export default ' : 'module.exports ='} {
-      data: ${JSON.stringify(exports || {})},
-      namespace: ${JSON.stringify(hash)}
-    }
+    /** ${normalizePath(resourcePath, cwd)} (extracted) **/
+    ${code} 
   `
 }
 
 const extractLoader: LoaderType = function (this: LoaderContext, source: string | Buffer) {
   const options: any = getOptions(this)
-  this.sourceMap = false
   this.cacheable(true)
-  return getModuleCode.call(
-    this,
-    Buffer.isBuffer(source) ? source.toString('utf8') : source,
-    options as LoaderOptions
-  )
+  const callback = this.async() || (() => {})
+  getModuleCode
+    .call(
+      this,
+      Buffer.isBuffer(source) ? source.toString('utf8') : source,
+      options as LoaderOptions
+    )
+    .then((code: string) => callback(null, code))
+    .catch(callback)
 }
 
 extractLoader.filepath = __filename

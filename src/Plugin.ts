@@ -1,6 +1,7 @@
 import webpack from 'webpack'
 import { addLoaderBefore, isTypeScriptProject } from './lib/utils'
 import { createDeclarations, getModuleDetails } from './lib/module'
+import ExtractPlugin, { ExtractPluginOptions } from './lib/ExtractPlugin'
 import extractLoader from './loader/extractLoader'
 import localeLoader from './loader/localeLoader'
 import ymlLoader from './loader/ymlLoader'
@@ -31,6 +32,7 @@ export type LoaderOptions = {
   extract: boolean
   extensions: string[]
   generator: ComponentLoader['getModuleCode']
+  extractor: ExtractPlugin | null
 }
 
 type PluginOptions = {
@@ -66,6 +68,11 @@ type PluginOptions = {
    * 默认根据运行环境自动设值。
    */
   extract?: boolean
+
+  /**
+   * 抽取语言定义插件的配置项。
+   */
+  extractOptions?: ExtractPluginOptions
 }
 
 /**
@@ -85,6 +92,7 @@ export default class LocaleWebpackPlugin implements webpack.Plugin {
   private readonly fileLoaders: LoaderType[]
   private readonly extensions: string[]
   private readonly moduleGenerator: (opts: ModuleGeneratorOptions) => string
+  private extractPlugin: ExtractPlugin | null = null
 
   constructor(options?: PluginOptions) {
     this.fileLoaders = [ymlLoader]
@@ -146,11 +154,13 @@ export default class LocaleWebpackPlugin implements webpack.Plugin {
       options: { esModule },
       extensions,
       moduleGenerator,
+      extractPlugin,
     } = this
     const options = {
       esModule,
       extensions,
       extract: extractLocales,
+      extractor: extractPlugin,
       generator: moduleGenerator,
     }
     const rule: webpack.RuleSetRule = { test, resourceQuery }
@@ -168,17 +178,20 @@ export default class LocaleWebpackPlugin implements webpack.Plugin {
   }
 
   apply(compiler: webpack.Compiler) {
-    const { test, extract } = this.options
+    const { test, extract, esModule, extractOptions } = this.options
     const { options: compilerOptions } = compiler
     const { mode, target } = compilerOptions
 
     let shouldExtract: any = extract
-    if (typeof shouldExtract !== 'boolean') {
-      if (target !== 'web') {
-        shouldExtract = false
-      } else {
-        shouldExtract = mode === 'production' || process.env.NODE_ENV === 'production'
-      }
+    if (/node|electron/.test(`${target}`)) {
+      shouldExtract = false
+    } else if (typeof shouldExtract !== 'boolean') {
+      shouldExtract = mode === 'production' || process.env.NODE_ENV === 'production'
+    }
+
+    if (shouldExtract) {
+      this.extractPlugin = new ExtractPlugin(Object.assign({}, extractOptions, { esModule }))
+      this.extractPlugin.apply(compiler)
     }
 
     const rule = {

@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { promisify } from 'util'
 import webpack from 'webpack'
 import { addLoaderBefore as addLoader, matchLoaderByName } from './addLoader'
 
@@ -73,7 +74,7 @@ export function getSelfContext() {
  * @param str 待处理的字符串。
  */
 export function escapeRegExpCharacters(str: string): string {
-  return str.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&').replace(/-/g, '\\x2d')
+  return str.replace(/[|/\\{}()[\]^$+*?.]/g, '\\$&').replace(/-/g, '\\x2d')
 }
 
 /**
@@ -111,10 +112,10 @@ export function normalizePath(filepath: string, base?: string) {
     filepath = path.relative(base, filepath)
   }
   filepath = filepath.replace(/\\/g, '/')
-  if (base && !filepath.startsWith('.')) {
+  if (base && filepath && !path.isAbsolute(filepath) && !filepath.startsWith('.')) {
     filepath = './' + filepath
   }
-  return filepath
+  return filepath || './'
 }
 
 /**
@@ -124,11 +125,86 @@ export function normalizePath(filepath: string, base?: string) {
  * @param base 相对于该路径
  */
 export function isSamePath(a: string, b: string, base: string = process.cwd()) {
-  if (!path.isAbsolute(a)) {
-    a = path.join(base, a)
+  a = !path.isAbsolute(a) ? path.join(base, a) : path.normalize(a)
+  b = !path.isAbsolute(b) ? path.join(base, b) : path.normalize(b)
+  return a.replace(/[/\\]+$/, '') === b.replace(/[/\\]+$/, '')
+}
+
+/**
+ * 获取格式化后的语言区域。
+ * @param locale 需要格式化的区域语言代码字符串。
+ * @return [lang-AREA, lang, AREA]
+ */
+export function normalizeLocale(locale?: string) {
+  if (typeof locale !== 'string') {
+    locale = ''
   }
-  if (!path.isAbsolute(b)) {
-    b = path.join(base, b)
+  const [langArea] = locale.split('.')
+  const [lang, area = ''] = langArea.split(/[-_]/)
+  const lowerLang = lang.toLowerCase()
+  const upperArea = area.toUpperCase()
+  return [`${lowerLang}${area ? '-' + upperArea : ''}`, lowerLang, upperArea]
+}
+
+/**
+ * 获取entries
+ * @param obj
+ */
+export function getEntries(obj: any) {
+  if (obj === null || typeof obj !== 'object') {
+    return []
   }
-  return a === b
+  return Object.entries(obj)
+}
+
+// 获取指定路径上不存在的目录
+function getUnExistsDirs(file: string) {
+  const unExistsDirs = []
+  while (!fs.existsSync((file = path.dirname(file)))) {
+    unExistsDirs.unshift(file)
+  }
+  return unExistsDirs
+}
+
+/**
+ * 同步写入文件。
+ * @param filePath
+ * @param content
+ */
+export function writeFileSync(filePath: string, content: string | Buffer) {
+  for (const dir of getUnExistsDirs(filePath)) {
+    fs.mkdirSync(dir)
+  }
+  fs.writeFileSync(filePath, content)
+}
+
+/**
+ * 异步写入文件。
+ * @param filePath
+ * @param content
+ */
+export async function writeFile(filePath: string, content: string | Buffer) {
+  const mkdir = promisify(fs.mkdir)
+  for (const dir of getUnExistsDirs(filePath)) {
+    await mkdir(dir)
+  }
+  await promisify(fs.writeFile)(filePath, content)
+}
+
+/**
+ * 获取当前使用的webpack模块。
+ * @param cwd 当前工程上下文目录。
+ */
+export function getWebpack(cwd = process.cwd()) {
+  try {
+    return require(require.resolve('webpack', { paths: [cwd] }))
+  } catch (e) {
+    const regx = /[/\\]node_modules[/\\]webpack[/\\]/
+    for (const [id, module] of Object.entries(require.cache)) {
+      if (regx.test(id)) {
+        return module!.exports
+      }
+    }
+  }
+  throw new Error('Can not find webpack module')
 }

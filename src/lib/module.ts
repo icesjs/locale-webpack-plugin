@@ -1,6 +1,12 @@
 import fs from 'fs'
 import path from 'path'
-import { escapeRegExpCharacters, getSelfContext, isSamePath, normalizePath } from './utils'
+import {
+  escapeRegExpCharacters,
+  getSelfContext,
+  isSamePath,
+  normalizePath,
+  writeFileSync,
+} from './utils'
 
 // 确保模块依赖被正确声明
 function ensureDependencies(moduleName: string, version: string) {
@@ -84,19 +90,6 @@ function ensureFileHelper(paths: any[], context: string, createLast: boolean = t
     }
   }
   return ''
-}
-
-// 写入内容到文件
-function writeFileSync(filePath: string, content: string) {
-  let file = filePath
-  const unExistsDirs = []
-  while (!fs.existsSync((file = path.dirname(file)))) {
-    unExistsDirs.unshift(file)
-  }
-  for (const dir of unExistsDirs) {
-    fs.mkdirSync(dir)
-  }
-  fs.writeFileSync(filePath, content)
 }
 
 // 资源模块导出代码
