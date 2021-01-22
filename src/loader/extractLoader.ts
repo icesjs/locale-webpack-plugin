@@ -66,8 +66,9 @@ function evalModuleCode(this: LoaderContext, code: string) {
         return require(file)
       }
       dependencies.add(file)
-      // 模块内容由内部插件生成，所以是确定的
-      // 这里只需要进行数据解析加载即可
+      // 模块内容由内部插件生成，所以解析是确定的
+      // 不会有嵌套超过一层的导入
+      // 所以这里可以直接使用loadData进行数据加载
       return loadData.call(this, file)
     },
   })

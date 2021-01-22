@@ -29,10 +29,9 @@ function loadData(this: LoaderContext, source: string | Buffer) {
  * 生成仅单个静态模块时的模块代码。
  */
 function getStaticModuleCode(this: LoaderContext, source: string | Buffer, options: LoaderOptions) {
-  const { esModule, extract } = options
-  // 如果已经抽取模块，则不进行数据加载，由抽取层动态去加载数据，提升丁点性能
-  // 非抽取时，使用 merge 对数据进行格式化
-  const dataSet = extract ? {} : merge([loadData.call(this, source)])
+  const { esModule } = options
+  // 使用 merge 对数据进行格式化
+  const dataSet = merge([loadData.call(this, source)])
   const exports = JSON.stringify(dataSet)
   return `/** ${normalizePath(this.resourcePath, cwd)} **/\n${
     esModule ? 'export default ' : 'module.exports = '

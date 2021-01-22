@@ -259,6 +259,9 @@ export default class ExtractPlugin implements webpack.Plugin {
           .catch((err) => {
             delete storage.locales[locale]
             if (err && err.code === 'MODULE_NOT_FOUND') {
+              if (process.env.NODE_ENV === 'development') {
+                console.error(\`Language module not found: \${locale}\`)
+              }
               return {}
             }
             throw err
