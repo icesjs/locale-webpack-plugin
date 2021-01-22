@@ -94,16 +94,8 @@ async function getModuleCode(this: LoaderContext, source: string, options: Loade
   }
 
   const { extractor } = options
-  const namespace = getHashDigest(
-    // 开发模式时，命名空间绑定至资源路径，否则热更新时，会存在问题
-    // 产品模式时，命名空间绑定至数据内容，可以进行重复内容的去重
-    Buffer.from(process.env.NODE_ENV === 'development' ? resourcePath : JSON.stringify(exports)),
-    'md4',
-    'hex',
-    6
-  )
-
-  const code = await extractor!.extract(exports, namespace)
+  const hash = getHashDigest(Buffer.from(resourcePath), 'md4', 'hex', 8)
+  const code = await extractor!.extract(exports, hash)
   return `
     /** ${normalizePath(resourcePath, cwd)} (extracted) **/
     ${code} 

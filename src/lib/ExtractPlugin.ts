@@ -52,6 +52,7 @@ export default class ExtractPlugin implements webpack.Plugin {
   private readonly runtime: string
   private readonly localeFiles = new Map<string, string>()
   private readonly locales = new Map<string, { [k: string]: any }>()
+  private readonly hashMap = new Map<string, number>()
   private preload: string = ''
 
   constructor(options?: any) {
@@ -192,17 +193,24 @@ export default class ExtractPlugin implements webpack.Plugin {
   }
 
   // 将导出的语言定义数据抽出成单独的语言文件模块
-  async extract(exports: any, namespace: string) {
+  async extract(exports: any, hash: string) {
+    const { hashMap } = this
+    if (!hashMap.has(hash)) {
+      hashMap.set(hash, hashMap.size)
+    }
+    const namespace = hashMap.get(hash)
+
     for (const [loc, data] of getEntries(exports)) {
       const [locale] = normalizeLocale(loc)
       if (!this.locales.has(locale)) {
         this.locales.set(locale, {})
       }
       const localeData = this.locales.get(locale)
-      localeData![namespace] = data
+      localeData![namespace!] = data
     }
 
-    await this.writeLocalesFile()
+    // 对重复的项进行合并优化
+    await this.writeLocalesFile(this.optimize())
 
     const { esModule } = this.options
     const runtime = JSON.stringify(this.runtime)
@@ -214,11 +222,38 @@ export default class ExtractPlugin implements webpack.Plugin {
     `
   }
 
+  // 对数据进行优化存储
+  optimize() {
+    const locales = new Map<string, { [h: string]: { [k: string]: any } }>()
+    for (const [loc, data] of this.locales) {
+      const entries = getEntries(data) as [string, any]
+      // 构建字典项
+      const keys = new Set<string>()
+      const values = new Set<any>()
+      for (const [, o] of entries) {
+        for (const [k, v] of getEntries(o)) {
+          keys.add(k)
+          values.add(v)
+        }
+      }
+      // 构建消息索引
+      const set = { k: [...keys], v: [...values] } as { [p: string]: any }
+      for (const [h, o] of entries) {
+        const entry = (set[h] = {} as { [k: string]: any })
+        for (const [k, v] of getEntries(o)) {
+          entry[set.k.indexOf(k)] = set.v.indexOf(v)
+        }
+      }
+      locales.set(loc, set)
+    }
+    return locales
+  }
+
   // 生成临时的locale文件
-  async writeLocalesFile() {
-    for (const [locale, data] of this.locales) {
-      const file = `${path.resolve(this.tmpDir, locale)}.json`
-      const content = JSON.stringify(data, null, 2)
+  async writeLocalesFile(locales: ReturnType<typeof ExtractPlugin.prototype.optimize>) {
+    for (const [loc, data] of locales) {
+      const file = `${path.resolve(this.tmpDir, loc)}.json`
+      const content = `${JSON.stringify(data, null, 2)}`
       // 这里对文件内容进行下缓存判定，减少磁盘IO
       if (this.localeFiles.get(file) === content) {
         continue
@@ -272,7 +307,7 @@ export default class ExtractPlugin implements webpack.Plugin {
       ;(async () => {
          const promise = formatRes(
            import(
-             /* webpackChunkName: ${JSON.stringify(chunkName + 'pre')} */
+             /* webpackChunkName: ${JSON.stringify(chunkName + 'p')} */
              /* webpackMode: "lazy" */
              /* webpackPreload: true */
              ${JSON.stringify(locales + preloadLocale + '.json')}
@@ -300,15 +335,22 @@ export default class ExtractPlugin implements webpack.Plugin {
       }
 
       const assemble = (namespace) => {
-        const namespaceData = {}
+        const namespaceData = storage.namespaces[namespace] || {}
         for (const [locale, data] of Object.entries(storage.locales)) {
           if (data instanceof Promise) {
             continue
           }
-          namespaceData[locale] = data[namespace] || {}
+          if (!namespaceData[locale]) {
+            const dataSet = data[namespace] || {}
+            const decoded = {}
+            for (const [key, val] of Object.entries(dataSet)) {
+              decoded[data.k[key]] = data.v[val]
+            }
+            namespaceData[locale] = decoded
+          }
         }
         storage.namespaces[namespace] = namespaceData
-        return namespaceData
+        return { ...namespaceData }
       }
 
       const asyncLoader = (namespace) => async (locale) => {
