@@ -105,7 +105,7 @@ export const pitch = function (this: LoaderContext) {
   const callback = this.async() || (() => {})
 
   // 处理包含导入情况
-  parseIncludeAsync(this.resourcePath, this.fs as typeof fs)
+  parseIncludeAsync(this.resourcePath, this.fs as typeof fs, options.resolveAlias)
     // 如果包含include进来的模块，则导入该模块
     .then(({ error, warnings, files }) => {
       for (const warn of warnings) {

@@ -33,6 +33,7 @@ export type LoaderOptions = {
   extensions: string[]
   generator: ComponentLoader['getModuleCode']
   extractor: ExtractPlugin | null
+  resolveAlias: { [p: string]: string } | null
 }
 
 type PluginOptions = {
@@ -93,6 +94,7 @@ export default class LocaleWebpackPlugin implements webpack.Plugin {
   private readonly extensions: string[]
   private readonly moduleGenerator: (opts: ModuleGeneratorOptions) => string
   private extractPlugin: ExtractPlugin | null = null
+  private resolveAlias: { [p: string]: string } | null = null
 
   constructor(options?: PluginOptions) {
     this.fileLoaders = [ymlLoader]
@@ -155,10 +157,12 @@ export default class LocaleWebpackPlugin implements webpack.Plugin {
       extensions,
       moduleGenerator,
       extractPlugin,
+      resolveAlias,
     } = this
     const options = {
       esModule,
       extensions,
+      resolveAlias,
       extract: extractLocales,
       extractor: extractPlugin,
       generator: moduleGenerator,
@@ -180,7 +184,9 @@ export default class LocaleWebpackPlugin implements webpack.Plugin {
   apply(compiler: webpack.Compiler) {
     const { test, extract, esModule, extractOptions } = this.options
     const { options: compilerOptions } = compiler
-    const { mode, target } = compilerOptions
+    const { mode, target, resolve = {} } = compilerOptions
+    const { alias: resolveAlias } = resolve
+    this.resolveAlias = resolveAlias || null
 
     let shouldExtract: any = extract
     if (/node|electron/.test(`${target}`)) {

@@ -16,7 +16,7 @@
 
 import fs from 'fs'
 import path from 'path'
-import { normalizePath } from './utils'
+import { getEntries, normalizePath } from './utils'
 
 // 匹配指令声明的正则表达式
 // 0号元素为指令 分组1为引号、分组2为contextPath、分组3为modulePath
@@ -127,18 +127,58 @@ async function resolveFile(filePath: string, fileSystem?: typeof fs) {
 }
 
 /**
+ * 解析文件路径。
+ * @param file 待解析的文件路径
+ * @param resolveAlias 解析别名配置
+ * @param context 解析上下文根路径
+ */
+function resolvePath(file: string, resolveAlias: { [p: string]: any } | null, context: string) {
+  let aliasFile = ''
+  for (let [alias, val] of getEntries(resolveAlias)) {
+    if (typeof val !== 'string' || /^\s*$/.test(val)) {
+      continue
+    }
+    const to = val.trim()
+    if (alias.endsWith('$')) {
+      if (file === alias.substr(0, alias.length - 1)) {
+        // 精准匹配
+        aliasFile = to
+      }
+    } else if (file.startsWith(alias + '/')) {
+      aliasFile = path.join(to, file.substr(alias.length + 1))
+    }
+    if (aliasFile) {
+      break
+    }
+  }
+
+  if (aliasFile) {
+    if (path.isAbsolute(aliasFile)) {
+      file = aliasFile
+    } else {
+      file = path.join(context, aliasFile)
+    }
+  } else {
+    file = path.join(context, file)
+  }
+  return file
+}
+
+/**
  * 从文件内容中解析include指令。
  * 返回所有按导入顺序依赖的文件列表。
  * @param fileNode
  * @param parentFileNode
  * @param resolvedFileMap
  * @param fileSystem
+ * @param resolveAlias
  */
 async function parseDirective(
   fileNode: FileNodeType,
   parentFileNode: FileNodeType | null,
   resolvedFileMap: { [key: string]: FileNodeType },
-  fileSystem?: typeof fs
+  fileSystem?: typeof fs,
+  resolveAlias: { [p: string]: string } | null = null
 ) {
   if (!fileNode.children) {
     fileNode.children = []
@@ -159,9 +199,9 @@ async function parseDirective(
 
     const includePath = contextPath
       ? // 从当前目录的相对路径导入
-        path.join(context, contextPath)
+        resolvePath(contextPath, resolveAlias, context)
       : // 从 node_modules 导入
-        path.join(cwd, 'node_modules', modulePath)
+        resolvePath(modulePath, resolveAlias, path.join(cwd, 'node_modules'))
 
     // 解析文件
     const resolvedFile =
@@ -187,7 +227,9 @@ async function parseDirective(
     }
 
     // 解析导入文件里的其他导入
-    children.push(...(await parseDirective(resolvedFile, fileNode, resolvedFileMap, fileSystem)))
+    children.push(
+      ...(await parseDirective(resolvedFile, fileNode, resolvedFileMap, fileSystem, resolveAlias))
+    )
   }
 
   // 检查文件是否使用了不符合语法的#include指令，并给出提示
@@ -319,14 +361,25 @@ function serializeFiles(fileNodes: FileNodeType[]) {
  * 解析yml文件导入指令。
  * @param file 待解析文件的路径。
  * @param fileSystem webpack可缓存的文件系统。
+ * @param resolveAlias 解析别名配置。
  */
-export default async function parseIncludeAsync(file: string, fileSystem?: typeof fs) {
+export default async function parseIncludeAsync(
+  file: string,
+  fileSystem?: typeof fs,
+  resolveAlias?: { [p: string]: string } | null
+) {
   const fileNode = await readFileAsync(file, fileSystem)
   const resolvedFileMap = {
     [fileNode.file]: fileNode,
   }
   try {
-    const fileNodes = await parseDirective(fileNode, null, resolvedFileMap, fileSystem)
+    const fileNodes = await parseDirective(
+      fileNode,
+      null,
+      resolvedFileMap,
+      fileSystem,
+      resolveAlias
+    )
     // 将结果按导入的顺序整理后返回
     return {
       files: serializeFiles(fileNodes.concat(fileNode)),
