@@ -1,6 +1,6 @@
 import fs from 'fs'
 import webpack from 'webpack'
-import { getOptions, stringifyRequest, urlToRequest } from 'loader-utils'
+import { getOptions, stringifyRequest } from 'loader-utils'
 import { normalizePath } from '../lib/utils'
 import { LoaderOptions, LoaderType } from '../Plugin'
 
@@ -17,7 +17,7 @@ export const pitch = function (this: LoaderContext) {
 
   this.cacheable(true)
   const callback = this.async() || (() => {})
-  const request = urlToRequest(this.resourcePath + query)
+  const request = normalizePath(this.resourcePath, this.context) + query
 
   this.loadModule(request, (err) => {
     if (err) {
