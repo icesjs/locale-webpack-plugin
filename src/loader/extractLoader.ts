@@ -95,7 +95,7 @@ async function getModuleCode(this: LoaderContext, source: string, options: Loade
 
   const { extractor } = options
   const hash = getHashDigest(Buffer.from(resourcePath), 'md4', 'hex', 8)
-  const code = await extractor!.extract(exports, hash)
+  const code = await extractor!.extract(exports, hash, resourcePath.replace(/\\/g, '/'))
   return `
     /** ${normalizePath(resourcePath, cwd)} (extracted) **/
     ${code} 

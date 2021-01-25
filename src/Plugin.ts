@@ -184,15 +184,13 @@ export default class LocaleWebpackPlugin implements webpack.Plugin {
   apply(compiler: webpack.Compiler) {
     const { test, extract, esModule, extractOptions } = this.options
     const { options: compilerOptions } = compiler
-    const { mode, target, resolve = {} } = compilerOptions
+    const { target, resolve = {} } = compilerOptions
     const { alias: resolveAlias } = resolve
     this.resolveAlias = resolveAlias || null
 
     let shouldExtract: any = extract
-    if (/node|electron/.test(`${target}`)) {
-      shouldExtract = false
-    } else if (typeof shouldExtract !== 'boolean') {
-      shouldExtract = mode === 'production' || process.env.NODE_ENV === 'production'
+    if (typeof shouldExtract !== 'boolean') {
+      shouldExtract = !/node|electron/.test(`${target}`)
     }
 
     if (shouldExtract) {
