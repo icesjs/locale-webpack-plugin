@@ -1,4 +1,4 @@
-import webpack from 'webpack'
+import * as webpack from 'webpack'
 import { addLoaderBefore, isTypeScriptProject } from './lib/utils'
 import { createDeclarations, getModuleDetails } from './lib/module'
 import ExtractPlugin, { ExtractPluginOptions } from './lib/ExtractPlugin'

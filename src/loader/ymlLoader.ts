@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import webpack from 'webpack'
+import * as webpack from 'webpack'
 import { stringifyRequest, getOptions } from 'loader-utils'
 import { getIdentifierMaker, normalizePath } from '../lib/utils'
 import parseIncludeAsync from '../lib/include'

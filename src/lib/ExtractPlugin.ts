@@ -52,7 +52,7 @@ export default class ExtractPlugin implements webpack.Plugin {
   private readonly runtime: string
   private readonly localeFiles = new Map<string, string>()
   private readonly locales = new Map<string, { [k: string]: any }>()
-  private readonly hashMap = new Map<string, { id: number; path: string }>()
+  private readonly hashMap = new Map<string, number>()
   private preload: string = ''
 
   constructor(options?: any) {
@@ -61,6 +61,7 @@ export default class ExtractPlugin implements webpack.Plugin {
         tmpDir: 'src/.locales',
         outputDir: 'locales',
         esModule: true,
+        manifest: false,
         preload: process.env.REACT_APP_FALLBACK_LOCALE || process.env.VUE_APP_FALLBACK_LOCALE,
       },
       options
@@ -193,12 +194,12 @@ export default class ExtractPlugin implements webpack.Plugin {
   }
 
   // 将导出的语言定义数据抽出成单独的语言文件模块
-  async extract(exports: any, hash: string, resource: string) {
+  async extract(exports: any, hash: string) {
     const { hashMap } = this
     if (!hashMap.has(hash)) {
-      hashMap.set(hash, { id: hashMap.size, path: resource })
+      hashMap.set(hash, hashMap.size)
     }
-    const namespace = hashMap.get(hash)!.id
+    const namespace = hashMap.get(hash)
 
     for (const [loc, data] of getEntries(exports)) {
       const [locale] = normalizeLocale(loc)
@@ -261,18 +262,6 @@ export default class ExtractPlugin implements webpack.Plugin {
       await writeFile(file, content)
       this.localeFiles.set(file, content)
     }
-
-    try {
-      // 创建清单文件，ts-plugin-locale会需要这个清单文件
-      const manifest = {} as { [p: string]: number }
-      for (const { id, path: resource } of this.hashMap.values()) {
-        manifest[resource] = id
-      }
-      await writeFile(
-        path.resolve('node_modules', '.locale-plugin', 'manifest.json'),
-        JSON.stringify(manifest, null, 2)
-      )
-    } catch (e) {}
   }
 
   // 创建运行时代码

@@ -78,7 +78,7 @@ async function readFileAsync(file: string, fileSystem: typeof fs = fs): Promise<
       }
     }
     fileNode.isDir = stats.isDirectory()
-    if (!fileNode.isDir) {
+    if (stats.isFile()) {
       const source = await new Promise<Buffer>((resolve, reject) => {
         fileSystem.readFile(file, (err, content) => (err ? reject(err) : resolve(content)))
       })

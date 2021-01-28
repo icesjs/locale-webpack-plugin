@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import vm from 'vm'
 import * as babel from '@babel/core'
-import webpack from 'webpack'
+import * as webpack from 'webpack'
 import { getHashDigest, getOptions } from 'loader-utils'
 import { normalizePath } from '../lib/utils'
 import merge from '../lib/merge'
@@ -49,6 +49,10 @@ function transformCode(originalCode: string) {
   return code
 }
 
+function isMergeModule(file: string) {
+  return mergeModulePath === file || `${mergeModulePath}.js` === file
+}
+
 /**
  * 执行模块代码，获取导出结果及依赖信息
  */
@@ -61,7 +65,7 @@ function evalModuleCode(this: LoaderContext, code: string) {
     require: (file: string) => {
       file = file.split('!').pop()!.replace(/\?.*/, '')
       file = path.isAbsolute(file) ? file : path.join(this.context, file)
-      if (mergeModulePath === file || `${mergeModulePath}.js` === file) {
+      if (isMergeModule(file)) {
         dependencies.add(file.replace(/(?:\.js)?$/, '.js'))
         return require(file)
       }
@@ -95,7 +99,7 @@ async function getModuleCode(this: LoaderContext, source: string, options: Loade
 
   const { extractor } = options
   const hash = getHashDigest(Buffer.from(resourcePath), 'md4', 'hex', 8)
-  const code = await extractor!.extract(exports, hash, resourcePath.replace(/\\/g, '/'))
+  const code = await extractor!.extract(exports, hash)
   return `
     /** ${normalizePath(resourcePath, cwd)} (extracted) **/
     ${code} 

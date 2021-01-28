@@ -1,5 +1,5 @@
 import fs from 'fs'
-import webpack from 'webpack'
+import * as webpack from 'webpack'
 import { getOptions, stringifyRequest } from 'loader-utils'
 import { normalizePath } from '../lib/utils'
 import { LoaderOptions, LoaderType } from '../Plugin'
