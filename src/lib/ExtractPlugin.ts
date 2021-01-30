@@ -7,7 +7,6 @@ import {
   isSamePath,
   normalizeLocale,
   normalizePath,
-  writeFile,
   writeFileSync,
 } from './utils'
 
@@ -210,8 +209,8 @@ export default class ExtractPlugin implements webpack.Plugin {
       localeData![namespace!] = data
     }
 
-    // 对重复的项进行合并优化
-    await this.writeLocalesFile(this.optimize())
+    // 同步写入临时语言定义文件
+    this.writeLocalesFile(this.optimize())
 
     const { esModule } = this.options
     const runtime = JSON.stringify(this.runtime)
@@ -251,7 +250,7 @@ export default class ExtractPlugin implements webpack.Plugin {
   }
 
   // 生成临时的locale文件
-  async writeLocalesFile(locales: ReturnType<typeof ExtractPlugin.prototype.optimize>) {
+  writeLocalesFile(locales: ReturnType<typeof ExtractPlugin.prototype.optimize>) {
     for (const [loc, data] of locales) {
       const file = `${path.resolve(this.tmpDir, loc)}.json`
       const content = `${JSON.stringify(data, null, 2)}`
@@ -259,7 +258,7 @@ export default class ExtractPlugin implements webpack.Plugin {
       if (this.localeFiles.get(file) === content) {
         continue
       }
-      await writeFile(file, content)
+      fs.writeFileSync(file, content)
       this.localeFiles.set(file, content)
     }
   }

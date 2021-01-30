@@ -1,6 +1,5 @@
 import fs from 'fs'
 import path from 'path'
-import { promisify } from 'util'
 import webpack from 'webpack'
 import { addLoaderBefore as addLoader, matchLoaderByName } from './addLoader'
 
@@ -176,35 +175,4 @@ export function writeFileSync(filePath: string, content: string | Buffer) {
     fs.mkdirSync(dir)
   }
   fs.writeFileSync(filePath, content)
-}
-
-/**
- * 异步写入文件。
- * @param filePath
- * @param content
- */
-export async function writeFile(filePath: string, content: string | Buffer) {
-  const mkdir = promisify(fs.mkdir)
-  for (const dir of getUnExistsDirs(filePath)) {
-    await mkdir(dir)
-  }
-  await promisify(fs.writeFile)(filePath, content)
-}
-
-/**
- * 获取当前使用的webpack模块。
- * @param cwd 当前工程上下文目录。
- */
-export function getWebpack(cwd = process.cwd()) {
-  try {
-    return require(require.resolve('webpack', { paths: [cwd] }))
-  } catch (e) {
-    const regx = /[/\\]node_modules[/\\]webpack[/\\]/
-    for (const [id, module] of Object.entries(require.cache)) {
-      if (regx.test(id)) {
-        return module!.exports
-      }
-    }
-  }
-  throw new Error('Can not find webpack module')
 }
