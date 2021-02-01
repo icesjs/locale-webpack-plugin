@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import webpack from 'webpack'
-import { addLoaderBefore as addLoader, matchLoaderByName } from './addLoader'
+import { addBefore } from '@ices/use-loader'
 
 /**
  * 在指定loader之前添加新的loader。
@@ -20,7 +20,7 @@ export function addLoaderBefore(
   config.module = module
 
   for (const name of tries) {
-    if (addLoader(config, matchLoaderByName(name), rule)) {
+    if (addBefore(config, name, rule)) {
       return
     }
   }
