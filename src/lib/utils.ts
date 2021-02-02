@@ -1,31 +1,5 @@
 import fs from 'fs'
 import path from 'path'
-import webpack from 'webpack'
-import { addBefore } from '@ices/use-loader'
-
-/**
- * 在指定loader之前添加新的loader。
- * @param config
- * @param rule
- * @param tries
- */
-export function addLoaderBefore(
-  config: webpack.Configuration,
-  rule: webpack.RuleSetRule,
-  tries: string[]
-) {
-  const { module = { rules: [] } } = config
-  const { rules } = module
-  module.rules = rules
-  config.module = module
-
-  for (const name of tries) {
-    if (addBefore(config, name, rule)) {
-      return
-    }
-  }
-  rules.push(rule)
-}
 
 /**
  * 简单判断当前的工程，是不是一个typescript工程。

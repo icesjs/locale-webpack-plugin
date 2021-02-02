@@ -1,5 +1,6 @@
 import * as webpack from 'webpack'
-import { addLoaderBefore, isTypeScriptProject } from './lib/utils'
+import { addBefore as addLoaderBefore } from '@ices/use-loader'
+import { isTypeScriptProject } from './lib/utils'
 import { createDeclarations, getModuleDetails } from './lib/module'
 import ExtractPlugin, { ExtractPluginOptions } from './lib/ExtractPlugin'
 import extractLoader from './loader/extractLoader'
@@ -208,6 +209,11 @@ export default class LocaleWebpackPlugin implements webpack.Plugin {
         },
       ],
     }
-    addLoaderBefore(compilerOptions, rule, ['file-loader', 'url-loader'])
+
+    addLoaderBefore(
+      compilerOptions,
+      ({ name, isUseItem }) => !isUseItem && name === 'file-loader',
+      rule
+    )
   }
 }
