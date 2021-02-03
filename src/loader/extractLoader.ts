@@ -92,9 +92,11 @@ async function getModuleCode(this: LoaderContext, source: string, options: Loade
   const { resourcePath } = this
 
   this.clearDependencies()
-  this.addDependency(resourcePath)
-  for (const deps of dependencies) {
-    this.addDependency(deps)
+  if (options.mode === 'development') {
+    this.addDependency(resourcePath)
+    for (const deps of dependencies) {
+      this.addDependency(deps)
+    }
   }
 
   const { extractor } = options
@@ -102,7 +104,7 @@ async function getModuleCode(this: LoaderContext, source: string, options: Loade
   const code = await extractor!.extract(exports, hash)
   return `
     /** ${normalizePath(resourcePath, cwd)} (extracted) **/
-    ${code} 
+    ${code}
   `
 }
 

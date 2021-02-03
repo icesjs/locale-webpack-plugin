@@ -29,6 +29,7 @@ interface ComponentLoader {
 }
 
 export type LoaderOptions = {
+  mode?: string
   esModule: boolean
   extract: boolean
   extensions: string[]
@@ -96,6 +97,7 @@ export default class LocaleWebpackPlugin implements webpack.Plugin {
   private readonly moduleGenerator: (opts: ModuleGeneratorOptions) => string
   private extractPlugin: ExtractPlugin | null = null
   private resolveAlias: { [p: string]: string } | null = null
+  private mode: string | undefined
 
   constructor(options?: PluginOptions) {
     this.fileLoaders = [ymlLoader]
@@ -159,8 +161,10 @@ export default class LocaleWebpackPlugin implements webpack.Plugin {
       moduleGenerator,
       extractPlugin,
       resolveAlias,
+      mode,
     } = this
     const options = {
+      mode,
       esModule,
       extensions,
       resolveAlias,
@@ -185,9 +189,10 @@ export default class LocaleWebpackPlugin implements webpack.Plugin {
   apply(compiler: webpack.Compiler) {
     const { test, extract, esModule, extractOptions } = this.options
     const { options: compilerOptions } = compiler
-    const { target, resolve = {} } = compilerOptions
+    const { target, resolve = {}, mode } = compilerOptions
     const { alias: resolveAlias } = resolve
     this.resolveAlias = resolveAlias || null
+    this.mode = !mode || mode === 'none' ? process.env.NODE_ENV : mode
 
     let shouldExtract: any = extract
     if (typeof shouldExtract !== 'boolean') {
@@ -201,7 +206,6 @@ export default class LocaleWebpackPlugin implements webpack.Plugin {
 
     const rule = {
       test,
-      enforce: 'pre' as 'pre',
       rules: [
         this.getLoaderRule(localeLoader),
         {

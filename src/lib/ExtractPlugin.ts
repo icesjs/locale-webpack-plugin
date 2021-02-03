@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import webpack from 'webpack'
+import * as webpack from 'webpack'
 import {
   escapeRegExpCharacters,
   getEntries,
@@ -26,10 +26,20 @@ export type ExtractPluginOptions = {
 
   /**
    * 应用preload加载的首选语言代码。
-   * 默认使用 REACT_APP_FALLBACK_LOCALE、VUE_APP_FALLBACK_LOCALE 环境变量值。
+   * 默认使用 REACT_APP_FALLBACK_LOCALE、VUE_APP_FALLBACK_LOCALE、REACT_APP_DEFAULT_LOCALE、VUE_APP_DEFAULT_LOCALE 环境变量值。
    * 仅现代浏览器支持该特性。
+   * webpack4 版本对preload支持很差，使用preload标记的chunk，并不会真的通过preload形式来加载。
+   * webpack5 版本提供了可用的preload的支持。
    */
   preload?: string
+
+  /**
+   * preload的资源，是否使用 eager 模式。不启用该项的情况下会使用 lazy 模式。
+   * eager 模式下，资源不会被分割成单独的块，且将直接与主块打包在一起。
+   * 如果 preload 的语言文件不是很大，可启用该项，将主语言文件与主代码打包在一起。
+   * 如果 preload 的语言文件很大，使用 lazy 模式将语言文件单独分割成一个文件，有利于首屏先渲染出其他内容。
+   */
+  preloadEagerMode: boolean
 
   /**
    * 被抽取的模块代码，是否使用esModule导出。
@@ -60,8 +70,12 @@ export default class ExtractPlugin implements webpack.Plugin {
         tmpDir: 'src/.locales',
         outputDir: 'locales',
         esModule: true,
-        manifest: false,
-        preload: process.env.REACT_APP_FALLBACK_LOCALE || process.env.VUE_APP_FALLBACK_LOCALE,
+        preloadEagerMode: false,
+        preload:
+          process.env.REACT_APP_FALLBACK_LOCALE ||
+          process.env.VUE_APP_FALLBACK_LOCALE ||
+          process.env.REACT_APP_DEFAULT_LOCALE ||
+          process.env.VUE_APP_DEFAULT_LOCALE,
       },
       options
     )
@@ -258,18 +272,19 @@ export default class ExtractPlugin implements webpack.Plugin {
       if (this.localeFiles.get(file) === content) {
         continue
       }
-      fs.writeFileSync(file, content)
+      writeFileSync(file, content)
       this.localeFiles.set(file, content)
     }
   }
 
   // 创建运行时代码
   createRuntime() {
-    const { outputDir, esModule, preload } = this.options
+    const { outputDir, esModule, preload, preloadEagerMode } = this.options
     const output = typeof outputDir === 'string' ? outputDir : 'locales'
     if (path.isAbsolute(output) || output.startsWith('..')) {
       throw new Error('Arguments Error: outputDir must be relative to build path')
     }
+
     const localesRoot = this.tmpDir
     const runtime = path.join(localesRoot, 'runtime.js')
     const chunkName = `${output.replace(/\\/g, '/').replace(/^\.?\/+|\/+$/, '')}/`
@@ -308,13 +323,13 @@ export default class ExtractPlugin implements webpack.Plugin {
          const promise = formatRes(
            import(
              /* webpackChunkName: ${JSON.stringify(chunkName + 'p')} */
-             /* webpackMode: "lazy" */
+             /* webpackMode: "${preloadEagerMode ? 'eager' : 'lazy'}" */
              /* webpackPreload: true */
              ${JSON.stringify(locales + preloadLocale + '.json')}
            ), ${JSON.stringify(preloadLocale)}
          )
          storage.locales[${JSON.stringify(preloadLocale)}] = promise
-         storage.locales[${JSON.stringify(preloadLocale)}] = await promise    
+         storage.locales[${JSON.stringify(preloadLocale)}] = await promise
         })()`
               : ''
           }
