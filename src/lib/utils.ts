@@ -27,11 +27,12 @@ export function getSelfContext() {
   const cwd = fs.realpathSync(process.cwd())
   let file = __filename
   while (!fs.existsSync(path.join((file = path.dirname(file)), 'package.json'))) {
-    if (file === cwd) {
+    if (file === cwd || path.basename(file) === 'node_modules') {
+      file = ''
       break
     }
   }
-  if (file !== cwd) {
+  if (file && path.dirname(file) !== file) {
     return file
   }
   try {

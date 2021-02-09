@@ -1,5 +1,5 @@
 import * as webpack from 'webpack'
-import { addBefore as addLoaderBefore } from '@ices/use-loader'
+import { addLoaderBefore } from '@ices/use-loader'
 import { isTypeScriptProject } from './lib/utils'
 import { createDeclarations, getModuleDetails } from './lib/module'
 import ExtractPlugin, { ExtractPluginOptions } from './lib/ExtractPlugin'
