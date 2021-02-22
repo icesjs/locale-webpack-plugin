@@ -814,10 +814,10 @@
     lodash "^4.17.19"
     to-fast-properties "^2.0.0"
 
-"@ices/use-loader@^1.3.0":
-  version "1.3.0"
-  resolved "https://registry.npm.taobao.org/@ices/use-loader/download/@ices/use-loader-1.3.0.tgz?cache=0&sync_timestamp=1612853743211&other_urls=https%3A%2F%2Fregistry.npm.taobao.org%2F%40ices%2Fuse-loader%2Fdownload%2F%40ices%2Fuse-loader-1.3.0.tgz#617fd62b11808e297f69a82222817ff111348282"
-  integrity sha1-YX/WKxGAjil/aagiIoF/8RE0goI=
+"@ices/use-loader@^1.4.0":
+  version "1.4.0"
+  resolved "https://registry.npm.taobao.org/@ices/use-loader/download/@ices/use-loader-1.4.0.tgz?cache=0&sync_timestamp=1613828195918&other_urls=https%3A%2F%2Fregistry.npm.taobao.org%2F%40ices%2Fuse-loader%2Fdownload%2F%40ices%2Fuse-loader-1.4.0.tgz#9babb98b33aeda8bf2a1710d0fdc9b2212fa2202"
+  integrity sha1-m6u5izOu2ovyoXEND9ybIhL6IgI=
 
 "@types/anymatch@*":
   version "1.3.1"

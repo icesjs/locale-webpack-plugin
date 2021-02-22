@@ -295,6 +295,8 @@ export default class ExtractPlugin implements webpack.Plugin {
     writeFileSync(
       runtime,
       `
+      /* eslint-disable */
+      // @ts-nocheck
       // Runtime for load locales
 
       const storage = {
