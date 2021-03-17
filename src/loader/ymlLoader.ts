@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import * as webpack from 'webpack'
-import { stringifyRequest, getOptions } from 'loader-utils'
+import { getOptions, stringifyRequest } from 'loader-utils'
 import { getIdentifierMaker, normalizePath } from '../lib/utils'
 import parseIncludeAsync from '../lib/include'
 import merge from '../lib/merge'

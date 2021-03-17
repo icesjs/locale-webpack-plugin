@@ -30,7 +30,8 @@ export const pitch = function (this: LoaderContext) {
             esModule,
             rootContext: cwd,
             resourcePath: normalizePath(this.resourcePath, cwd),
-            module: stringifyRequest(this, request),
+            module: JSON.parse(stringifyRequest(this, request)),
+            hot: this.mode === 'development' && this.hot,
           })
         )
       } catch (err) {

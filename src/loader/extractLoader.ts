@@ -32,6 +32,9 @@ function loadData(this: LoaderContext, file: string) {
 function transformCode(originalCode: string) {
   const res = babel.transform(originalCode, {
     babelrc: false,
+    configFile: false,
+    sourceType: 'unambiguous',
+    filename: 'x.js',
     presets: [
       [
         require('@babel/preset-env'),

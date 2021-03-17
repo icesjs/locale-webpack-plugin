@@ -17,6 +17,7 @@ export interface LoaderType extends webpack.loader.Loader {
 }
 
 type ModuleGeneratorOptions = {
+  hot: boolean
   module: string
   esModule: boolean
   resourcePath: string
