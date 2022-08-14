@@ -39,7 +39,7 @@ export type ExtractPluginOptions = {
    * 如果 preload 的语言文件不是很大，可启用该项，将主语言文件与主代码打包在一起。
    * 如果 preload 的语言文件很大，使用 lazy 模式将语言文件单独分割成一个文件，有利于首屏先渲染出其他内容。
    */
-  preloadEagerMode: boolean
+  preloadEagerMode?: boolean
 
   /**
    * 被抽取的模块代码，是否使用esModule导出。
@@ -48,6 +48,7 @@ export type ExtractPluginOptions = {
 
   /**
    * 临时目录，用于生成locale文件。
+   * 该目录需要在 webpack 处理路径范围内。
    * 默认为 src/.locales 目录。
    */
   tmpDir?: string
