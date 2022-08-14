@@ -20,7 +20,8 @@ import { getEntries, normalizePath } from './utils'
 
 // 匹配指令声明的正则表达式
 // 0号元素为指令 分组1为引号、分组2为contextPath、分组3为modulePath
-const directiveRegx = /^\s*#include(?=[<'"\s](?!['"<>.\\/\s;]*$))\s*(?:(['"]?)\s*([^'"<>:*?|]+?)\s*\1|<(?!\s*(?:\.*[/\\]|\.{2,}))\s*([^'"<>:*?|]+?)\s*>)[\s;]*$/gm
+const directiveRegx =
+  /^\s*#include(?=[<'"\s](?!['"<>.\\/\s;]*$))\s*(?:(['"]?)\s*([^'"<>:*?|]+?)\s*\1|<(?!\s*(?:\.*[/\\]|\.{2,}))\s*([^'"<>:*?|]+?)\s*>)[\s;]*$/gm
 // 检查指令是否正确的正则表达式
 const checkDirectiveRegx = /^\s*#\s*include(?:[<'"]|\s(?!\s*$)).*$/gm
 // 解析文件名称的后缀
@@ -391,7 +392,7 @@ export default async function parseIncludeAsync(
     return {
       files: serializeFiles(Object.values(resolvedFileMap).concat(fileNode) as FileNodeType[]),
       warnings: serializeWarnings(resolvedFileMap),
-      error,
+      error: error as Error,
     }
   }
 }

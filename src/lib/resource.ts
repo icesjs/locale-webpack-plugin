@@ -14,6 +14,7 @@ import path from 'path'
 import yaml from 'js-yaml'
 import { normalizePath } from './utils'
 import { DataType, ParsedDataType } from './merge'
+
 type LoadResult = { data: ParsedDataType; warnings: Warning[] }
 
 const cwd = fs.realpathSync(process.cwd())
@@ -39,7 +40,7 @@ function loadYmlFile(source: string) {
   const data: DataType = yaml.load(source, {
     json: true,
     onWarning: (warn) => warnings.push(new Warning(warn.message)),
-  })
+  }) as DataType
   return { warnings, data }
 }
 

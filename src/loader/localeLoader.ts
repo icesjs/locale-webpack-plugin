@@ -35,7 +35,7 @@ export const pitch = function (this: LoaderContext) {
           })
         )
       } catch (err) {
-        callback(err)
+        callback(err as Error)
       }
     }
   })

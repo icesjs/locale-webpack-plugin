@@ -124,7 +124,7 @@ export const pitch = function (this: LoaderContext) {
           // 生成模块导入代码
           callback(null, getImportModuleCode.call(this, files, options as LoaderOptions))
         } catch (err) {
-          callback(err)
+          callback(err as Error)
         }
       } else {
         // 由 loader 常规处理
@@ -144,7 +144,7 @@ const ymlLoader: LoaderType = function (this: LoaderContext, source: string | Bu
   try {
     this.callback(null, getStaticModuleCode.call(this, source, options as LoaderOptions))
   } catch (err) {
-    this.callback(err)
+    this.callback(err as Error)
   }
 }
 
