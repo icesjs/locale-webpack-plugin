@@ -1,4 +1,5 @@
 import * as webpack from 'webpack'
+import { RuleSetCondition } from 'webpack'
 import { addLoaderBefore } from '@ices/use-loader'
 import { isTypeScriptProject } from './lib/utils'
 import { createDeclarations, getModuleDetails } from './lib/module'
@@ -11,8 +12,9 @@ export interface LoaderType extends webpack.loader.Loader {
   test?: RegExp
   filepath: string
   libName?: string
-  resourceQuery?: webpack.RuleSetCondition
+  resourceQuery?: RuleSetCondition
   extensions?: string[]
+
   [key: string]: any
 }
 
@@ -26,6 +28,7 @@ type ModuleGeneratorOptions = {
 
 interface ComponentLoader {
   getModuleCode(opts: ModuleGeneratorOptions): string
+
   getModuleExports(): string
 }
 
@@ -45,7 +48,15 @@ type PluginOptions = {
    * 用于对匹配到的文件进行模块化处理。
    * 默认匹配yml后缀格式文件。
    */
-  test?: RegExp | RegExp[]
+  test?: RuleSetCondition
+  /**
+   * 查询条件排除。
+   */
+  exclude?: RuleSetCondition
+  /**
+   * 查询条件包含。
+   */
+  include?: RuleSetCondition
   /**
    * 是否使用es模块导出代码。
    * 默认为 true。
@@ -188,7 +199,7 @@ export default class LocaleWebpackPlugin implements webpack.Plugin {
   }
 
   apply(compiler: webpack.Compiler) {
-    const { test, extract, esModule, extractOptions } = this.options
+    const { test, include, exclude, extract, esModule, extractOptions } = this.options
     const { options: compilerOptions } = compiler
     const { target, resolve = {}, mode } = compilerOptions
     const { alias: resolveAlias } = resolve
@@ -207,6 +218,8 @@ export default class LocaleWebpackPlugin implements webpack.Plugin {
 
     const rule = {
       test,
+      include,
+      exclude,
       rules: [
         this.getLoaderRule(localeLoader),
         {
@@ -217,7 +230,8 @@ export default class LocaleWebpackPlugin implements webpack.Plugin {
 
     addLoaderBefore(
       compilerOptions,
-      ({ name, isUseItem }) => !isUseItem && name === 'file-loader',
+      ({ name, type, isUseItem }) =>
+        !isUseItem && (name === 'file-loader' || /asset(\/resource)?/.test(`${type}`)),
       rule
     )
   }
