@@ -45,6 +45,16 @@ function loadYmlFile(source: string) {
 }
 
 /**
+ * 解析JSON文件。
+ * @param source
+ */
+function loadJsonFile(source: string) {
+  const warnings: Warning[] = []
+  const data: DataType = JSON.parse(source) as DataType
+  return { warnings, data }
+}
+
+/**
  * 根据扩展名列表，对文件进行分类加载。
  * @param source
  * @param ext 资源扩展名称
@@ -55,6 +65,9 @@ function loadFile(source: string, ext: string) {
     case '.yml':
     case '.yaml':
       res = loadYmlFile(source)
+      break
+    case '.json':
+      res = loadJsonFile(source)
       break
     default:
       res = { warnings: [] }

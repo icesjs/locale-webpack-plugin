@@ -10,7 +10,7 @@ import loadResource from '../lib/resource'
 import { LoaderOptions, LoaderType } from '../Plugin'
 
 const cwd = fs.realpathSync(process.cwd())
-const mergeModulePath = path.join(__dirname, '../lib/merge')
+const runtimeModulePath = path.join(__dirname, '../lib/runtime')
 
 type LoaderContext = webpack.loader.LoaderContext
 
@@ -52,8 +52,8 @@ function transformCode(originalCode: string) {
   return code
 }
 
-function isMergeModule(file: string) {
-  return mergeModulePath === file || `${mergeModulePath}.js` === file
+function isRuntimeModule(file: string) {
+  return runtimeModulePath === file || `${runtimeModulePath}.js` === file
 }
 
 /**
@@ -68,7 +68,7 @@ function evalModuleCode(this: LoaderContext, code: string) {
     require: (file: string) => {
       file = file.split('!').pop()!.replace(/\?.*/, '')
       file = path.isAbsolute(file) ? file : path.join(this.context, file)
-      if (isMergeModule(file)) {
+      if (isRuntimeModule(file)) {
         dependencies.add(file.replace(/(?:\.js)?$/, '.js'))
         return require(file)
       }

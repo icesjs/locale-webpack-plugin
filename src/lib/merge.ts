@@ -1,7 +1,3 @@
-/**
- * 这个文件需要在浏览器端运行。
- * 不要在这个里面写任何与 nodejs api 有关的代码。
- */
 //
 export type DataType = string | number | boolean | object | null | undefined
 export type ParsedDataType = Exclude<DataType, undefined>

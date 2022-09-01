@@ -52,6 +52,12 @@ export type ExtractPluginOptions = {
    * 默认为 src/.locales 目录。
    */
   tmpDir?: string
+
+  /**
+   * 是否对内容进行合并优化。默认为false。
+   * 如果语言条目内容不存在较多重复的值，则不需要启用该选项。
+   */
+  optimize?: boolean
 }
 
 export default class ExtractPlugin implements webpack.Plugin {
@@ -72,6 +78,7 @@ export default class ExtractPlugin implements webpack.Plugin {
         outputDir: 'locales',
         esModule: true,
         preloadEagerMode: false,
+        optimize: false,
         preload:
           process.env.REACT_APP_FALLBACK_LOCALE ||
           process.env.VUE_APP_FALLBACK_LOCALE ||
@@ -224,10 +231,10 @@ export default class ExtractPlugin implements webpack.Plugin {
       localeData![namespace!] = data
     }
 
+    const { esModule, optimize } = this.options
     // 同步写入临时语言定义文件
-    this.writeLocalesFile(this.optimize())
+    this.writeLocalesFile(optimize ? this.optimize() : this.locales)
 
-    const { esModule } = this.options
     const runtime = JSON.stringify(this.runtime)
     const loader = 'asyncLoader'
 
@@ -265,7 +272,7 @@ export default class ExtractPlugin implements webpack.Plugin {
   }
 
   // 生成临时的locale文件
-  writeLocalesFile(locales: ReturnType<typeof ExtractPlugin.prototype.optimize>) {
+  writeLocalesFile(locales: Map<string, any>) {
     for (const [loc, data] of locales) {
       const file = `${path.resolve(this.tmpDir, loc)}.json`
       const content = `${JSON.stringify(data, null, 2)}`
@@ -280,7 +287,7 @@ export default class ExtractPlugin implements webpack.Plugin {
 
   // 创建运行时代码
   createRuntime() {
-    const { outputDir, esModule, preload, preloadEagerMode } = this.options
+    const { outputDir, esModule, optimize, preload, preloadEagerMode } = this.options
     const output = typeof outputDir === 'string' ? outputDir : 'locales'
     if (path.isAbsolute(output) || output.startsWith('..')) {
       throw new Error('Arguments Error: outputDir must be relative to build path')
@@ -362,13 +369,18 @@ const assemble = (namespace) => {
     if (data instanceof Promise) {
       continue
     }
-    if (!namespaceData[locale]) {
+    if (!namespaceData[locale]) {${
+      optimize
+        ? `
       const dataSet = data[namespace] || {}
       const decoded = {}
       for (const [key, val] of Object.entries(dataSet)) {
         decoded[data.k[key]] = data.v[val]
       }
-      namespaceData[locale] = decoded
+      namespaceData[locale] = decoded`
+        : `
+      namespaceData[locale] = data[namespace] || {}`
+    }
     }
   }
   storage.namespaces[namespace] = namespaceData

@@ -12,7 +12,7 @@ type LoaderContext = webpack.loader.LoaderContext
 
 const cwd = fs.realpathSync(process.cwd())
 // 这个文件需要在浏览器端运行，辅助进行数据合并
-const runtime = path.join(__dirname, '../lib/merge')
+const runtime = path.join(__dirname, '../lib/runtime')
 
 /**
  * 加载单个模块资源。
@@ -76,14 +76,12 @@ function getImportModuleCode(
   // 添加模块自身数据
   const { file, source } = main!
   const mainId = getIdent(path.basename(file, path.extname(file)))
-  const mainData = loadData.call(this, source)
+  const mainData = merge([loadData.call(this, source)])
   codeSnippets.push(`const ${mainId} = ${JSON.stringify(mainData)}`)
 
   // 使用 merge 函数对所有数据进行合并
   const execMerge = `${identifiers[0]}([${identifiers
     .slice(1)
-    // 每个数据模块导出时都已通过merge处理，这里再次被导入，需要套一层data，才能再次被merge处理
-    .map((id) => `{data:${id}}`)
     // mainId变量模块是自身数据模块，是直接引用的本地数据，所以不需要套一层data，这里concat进变量
     .concat(mainId)
     .join(',')}])`
