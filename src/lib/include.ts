@@ -25,7 +25,7 @@ const directiveRegx =
 // 检查指令是否正确的正则表达式
 const checkDirectiveRegx = /^\s*#\s*include(?:[<'"]|\s(?!\s*$)).*$/gm
 // 解析文件名称的后缀
-const resolveExtensions = ['.yml', '.yaml']
+const resolveExtensions = ['.yml', '.yaml', '.json']
 // 当前工作目录
 const cwd = fs.realpathSync(process.cwd())
 
@@ -56,7 +56,7 @@ class Warning extends Error {
 
 // 获取匹配正则
 function getDirectiveRegx() {
-  // 因为是正则是循环匹配，文件是递归遍历，所以这里每一个节点用的匹配正则都重新实例化一个
+  // 因为正则是循环匹配，文件是递归遍历，所以这里每一个节点用的匹配正则都重新实例化一个
   return new RegExp(directiveRegx.source, directiveRegx.flags)
 }
 
@@ -185,57 +185,63 @@ async function parseDirective(
     fileNode.children = []
   }
 
-  const { context, children, source } = fileNode
-  const regx = getDirectiveRegx()
-  const contents = []
-  let contentsLastIndex = 0
-  let matched
+  if (/\.ya?ml$/i.test(fileNode.file)) {
+    const { context, children, source } = fileNode
+    const regx = getDirectiveRegx()
+    const contents = []
+    let contentsLastIndex = 0
+    let matched
 
-  // 这里的正则是多行匹配模式
-  while ((matched = regx.exec(source))) {
-    // 0号位为指令、1号位为引号、2号位为相对路径、3号位为node_modules路径
-    const [directive, , contextPath, modulePath] = matched
-    contents.push(source.substring(contentsLastIndex, matched.index))
-    contentsLastIndex = regx.lastIndex
+    // 这里的正则是多行匹配模式
+    while ((matched = regx.exec(source))) {
+      // 0号位为指令、1号位为引号、2号位为相对路径、3号位为node_modules路径
+      const [directive, , contextPath, modulePath] = matched
+      contents.push(source.substring(contentsLastIndex, matched.index))
+      contentsLastIndex = regx.lastIndex
 
-    const includePath = contextPath
-      ? // 从当前目录的相对路径导入
-        resolvePath(contextPath, resolveAlias, context)
-      : // 从 node_modules 导入
-        resolvePath(modulePath, resolveAlias, path.join(cwd, 'node_modules'))
+      const includePath = contextPath
+        ? // 从当前目录的相对路径导入
+          resolvePath(contextPath, resolveAlias, context)
+        : // 从 node_modules 导入
+          resolvePath(modulePath, resolveAlias, path.join(cwd, 'node_modules'))
 
-    // 解析文件
-    const resolvedFile =
-      resolvedFileMap[includePath] || (await resolveFile(includePath, fileSystem))
+      // 解析文件
+      const resolvedFile =
+        resolvedFileMap[includePath] || (await resolveFile(includePath, fileSystem))
 
-    const { file } = resolvedFile
-    const prevIncluded = resolvedFileMap[file]
-    resolvedFileMap[includePath] = prevIncluded || resolvedFile
-    resolvedFileMap[file] = prevIncluded || resolvedFile
+      const { file } = resolvedFile
+      const prevIncluded = resolvedFileMap[file]
+      resolvedFileMap[includePath] = prevIncluded || resolvedFile
+      resolvedFileMap[file] = prevIncluded || resolvedFile
 
-    if (file === fileNode.file) {
-      // 自己导入自己
-      continue
+      if (file === fileNode.file) {
+        // 自己导入自己
+        continue
+      }
+      // 检查文件信息，如果不存在则抛异常退出解析
+      checkExists(resolvedFile, fileNode, directive)
+
+      if (prevIncluded) {
+        // 已经发起过解析的文件，可能还未处理完成解析，这里标记下，然后在整体解析完成后，展开其子节点列表到对应位置
+        children.push({ ...resolvedFile, cycleIncluded: true })
+        // 这里也为排除循环解析的情况
+        continue
+      }
+
+      // 解析导入文件里的其他导入
+      children.push(
+        ...(await parseDirective(resolvedFile, fileNode, resolvedFileMap, fileSystem, resolveAlias))
+      )
     }
-    // 检查文件信息，如果不存在则抛异常退出解析
-    checkExists(resolvedFile, fileNode, directive)
 
-    if (prevIncluded) {
-      // 已经发起过解析的文件，可能还未处理完成解析，这里标记下，然后在整体解析完成后，展开其子节点列表到对应位置
-      children.push({ ...resolvedFile, cycleIncluded: true })
-      // 这里也为排除循环解析的情况
-      continue
-    }
-
-    // 解析导入文件里的其他导入
-    children.push(
-      ...(await parseDirective(resolvedFile, fileNode, resolvedFileMap, fileSystem, resolveAlias))
+    // 检查文件是否使用了不符合语法的#include指令，并给出提示
+    contents.push(source.substring(contentsLastIndex))
+    checkContents(
+      contents.map((str) => str.replace(/^\r?\n/, '')).join(''),
+      fileNode,
+      parentFileNode
     )
   }
-
-  // 检查文件是否使用了不符合语法的#include指令，并给出提示
-  contents.push(source.substring(contentsLastIndex))
-  checkContents(contents.map((str) => str.replace(/^\r?\n/, '')).join(''), fileNode, parentFileNode)
 
   // 合并引入，并返回包含导入文件和自身的文件列表
   return (

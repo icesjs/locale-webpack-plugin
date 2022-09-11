@@ -1,4 +1,5 @@
 import fs from 'fs'
+import path from 'path'
 import * as webpack from 'webpack'
 import { getOptions, stringifyRequest } from 'loader-utils'
 import { normalizePath } from '../lib/utils'
@@ -10,8 +11,15 @@ type LoaderContext = webpack.loader.LoaderContext
 export const pitch = function (this: LoaderContext) {
   const options: any = getOptions(this)
   const { generator, extensions, esModule } = options as LoaderOptions
+  const extensionsMatchRegx = new RegExp(
+    extensions.map((ext) => ext.replace(/([.$:?=!<>\[\]()|])/g, `\\$1`)).join('|')
+  )
   const query = `?${extensions.join('&')}`
-  if (this.resourceQuery === query) {
+  if (
+    this.resourceQuery === query ||
+    (!extensionsMatchRegx.test(this.resourceQuery) &&
+      !extensionsMatchRegx.test(path.extname(this.resourcePath).substring(1)))
+  ) {
     return
   }
 

@@ -33,6 +33,9 @@ function getStaticModuleCode(this: LoaderContext, source: string | Buffer, optio
   // 使用 merge 对数据进行格式化
   const dataSet = merge([loadData.call(this, source)])
   const exports = JSON.stringify(dataSet)
+  if (this.resourcePath.endsWith('.json')) {
+    return exports
+  }
   return `/** ${normalizePath(this.resourcePath, cwd)} **/\n${
     esModule ? 'export default ' : 'module.exports = '
   }${exports}
@@ -147,8 +150,8 @@ const ymlLoader: LoaderType = function (this: LoaderContext, source: string | Bu
 }
 
 ymlLoader.pitch = pitch
-ymlLoader.test = /\.ya?ml$/
-ymlLoader.resourceQuery = /ya?ml/
+ymlLoader.test = /\.(?:ya?ml|json)$/
+ymlLoader.resourceQuery = /ya?ml|json_include/
 ymlLoader.filepath = __filename
-ymlLoader.extensions = ['.yml', '.yaml']
+ymlLoader.extensions = ['.yml', '.yaml', '.json_include']
 export default ymlLoader
