@@ -2,25 +2,6 @@ import fs from 'fs'
 import path from 'path'
 
 /**
- * 简单判断当前的工程，是不是一个typescript工程。
- */
-export function isTypeScriptProject() {
-  const cwd = fs.realpathSync(process.cwd())
-  try {
-    for (const file of fs.readdirSync(cwd).reverse()) {
-      if (/tsconfig(\..+?)*\.json$/i.test(file)) {
-        const { dependencies = {}, devDependencies = {} } = require(path.join(cwd, 'package.json'))
-        if (dependencies.typescript || devDependencies.typescript) {
-          return !!require.resolve('typescript', { paths: [cwd] })
-        }
-        break
-      }
-    }
-  } catch (e) {}
-  return false
-}
-
-/**
  * 获取当前模块的根路径。
  */
 export function getSelfContext() {
@@ -56,7 +37,7 @@ export function escapeRegExpCharacters(str: string): string {
  * @param str 待处理的字符串。
  */
 export function capitalize(str: string) {
-  return str[0].toUpperCase() + str.substr(1)
+  return str[0].toUpperCase() + str.substring(1)
 }
 
 /**

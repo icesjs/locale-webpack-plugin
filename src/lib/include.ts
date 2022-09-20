@@ -195,15 +195,20 @@ async function parseDirective(
     // 这里的正则是多行匹配模式
     while ((matched = regx.exec(source))) {
       // 0号位为指令、1号位为引号、2号位为相对路径、3号位为node_modules路径
-      const [directive, , contextPath, modulePath] = matched
+      let [directive, , contextPath, modulePath] = matched
       contents.push(source.substring(contentsLastIndex, matched.index))
       contentsLastIndex = regx.lastIndex
+
+      if (contextPath?.startsWith('~')) {
+        modulePath = contextPath
+        contextPath = ''
+      }
 
       const includePath = contextPath
         ? // 从当前目录的相对路径导入
           resolvePath(contextPath, resolveAlias, context)
         : // 从 node_modules 导入
-          resolvePath(modulePath, resolveAlias, path.join(cwd, 'node_modules'))
+          resolvePath(modulePath.replace(/^~/, ''), resolveAlias, path.join(cwd, 'node_modules'))
 
       // 解析文件
       const resolvedFile =

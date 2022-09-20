@@ -40,11 +40,13 @@ function appendReferenceToProject(moduleName: string) {
   if (cwd === getSelfContext()) {
     return
   }
-  const typesPath = ensureFileHelper(['src/react-app-env.d.ts', 'src/types.d.ts'], cwd)
-  const refCode = `/// <reference types="${moduleName}" />`
-  const content = fs.readFileSync(typesPath, 'utf8')
-  if (!new RegExp(`^\s*${escapeRegExpCharacters(refCode)}\s*$`, 'm').test(content)) {
-    writeFileSync(typesPath, `${refCode}\n${content}`)
+  const typesPath = ensureFileHelper(['src/react-app-env.d.ts', 'src/types.d.ts'], cwd, false)
+  if (typesPath) {
+    const refCode = `/// <reference types="${moduleName}" />`
+    const content = fs.readFileSync(typesPath, 'utf8')
+    if (!new RegExp(`^\s*${escapeRegExpCharacters(refCode)}\s*$`, 'm').test(content)) {
+      writeFileSync(typesPath, `${refCode}\n${content}`)
+    }
   }
 }
 

@@ -1,7 +1,6 @@
 import * as webpack from 'webpack'
 import { RuleSetCondition } from 'webpack'
 import { addLoaderBefore } from '@ices/use-loader'
-import { isTypeScriptProject } from './lib/utils'
 import { createDeclarations, getModuleDetails } from './lib/module'
 import ExtractPlugin, { ExtractPluginOptions } from './lib/ExtractPlugin'
 import extractLoader from './loader/extractLoader'
@@ -69,16 +68,6 @@ type PluginOptions = {
    */
   componentType?: ComponentType
   /**
-   * 是否是 typescript 工程。
-   * 默认为自动检测工程根目录下是否包含 tsconfig(.xxx)*.json
-   * 以及 package.json 里是否声明了 typescript 依赖
-   * 并且检查 typescript 依赖是否已经安装。
-   * 是 typescript 工程会则创建资源模块的类型声明文件，以便提供代码智能提示和校验。
-   * 可以手动指定为 typescript 工程，以强制创建类型声明文件。
-   */
-  typescript?: boolean
-
-  /**
    * 是否将语言定义文件抽取成单独的文件发布。
    * 默认根据运行环境自动设值。
    */
@@ -121,13 +110,11 @@ export default class LocaleWebpackPlugin implements webpack.Plugin {
       },
       options
     )
-    const { componentType, typescript } = this.options
+    const { componentType } = this.options
     const moduleDetails = this.getLibModuleDetails(componentType)
     this.moduleGenerator = this.getModuleGenerator(moduleDetails)
     this.extensions = this.getSupportedExtensions()
-    if (typeof typescript === 'boolean' ? typescript : isTypeScriptProject()) {
-      createDeclarations(moduleDetails, this.extensions, 'lib/locale.d.ts')
-    }
+    createDeclarations(moduleDetails, this.extensions, 'lib/locale.d.ts')
   }
 
   getLibModuleDetails(componentType?: ComponentType) {

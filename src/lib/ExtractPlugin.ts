@@ -25,6 +25,11 @@ export type ExtractPluginOptions = {
   outputDir?: string
 
   /**
+   * 同outputDir。
+   */
+  outputPath?: string
+
+  /**
    * 应用preload加载的首选语言代码。
    * 默认使用 REACT_APP_FALLBACK_LOCALE、VUE_APP_FALLBACK_LOCALE、REACT_APP_DEFAULT_LOCALE、VUE_APP_DEFAULT_LOCALE 环境变量值。
    * 仅现代浏览器支持该特性。
@@ -52,6 +57,11 @@ export type ExtractPluginOptions = {
    * 默认为 src/.locales 目录。
    */
   tmpDir?: string
+
+  /**
+   * 同tmpDir。
+   */
+  cacheDir?: string
 
   /**
    * 是否对内容进行合并优化。默认为false。
@@ -87,6 +97,15 @@ export default class ExtractPlugin implements webpack.Plugin {
       },
       options
     )
+
+    const { cacheDir, outputPath } = this.options
+    if (cacheDir) {
+      this.options.tmpDir = cacheDir
+    }
+    if (outputPath) {
+      this.options.outputDir = outputPath
+    }
+
     const { tmpDir } = this.options
     this.checkTmpDir(tmpDir as string)
     this.tmpDir = path.resolve(tmpDir as string)
@@ -124,7 +143,7 @@ export default class ExtractPlugin implements webpack.Plugin {
 
   // 获取上下文模块
   getContextModules(modules: Module[]) {
-    return modules.filter((module) => {
+    return Array.from(modules).filter((module) => {
       if (!isSamePath(module.context || '', this.tmpDir, cwd)) {
         return false
       }
