@@ -195,7 +195,7 @@ export default class LocaleWebpackPlugin implements webpack.Plugin {
 
     let shouldExtract: any = extract
     if (typeof shouldExtract !== 'boolean') {
-      shouldExtract = !/node|electron/.test(`${target}`)
+      shouldExtract = this.mode === 'production' && !/node|electron/.test(`${target}`)
     }
 
     if (shouldExtract) {

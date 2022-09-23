@@ -78,7 +78,6 @@ export default class ExtractPlugin implements webpack.Plugin {
   private readonly runtime: string
   private readonly localeFiles = new Map<string, string>()
   private readonly locales = new Map<string, { [k: string]: any }>()
-  private readonly hashMap = new Map<string, number>()
   private preload: string = ''
 
   constructor(options?: any) {
@@ -114,7 +113,6 @@ export default class ExtractPlugin implements webpack.Plugin {
 
   // 应用插件
   apply(compiler: Compiler) {
-    this.clear()
     this.initPreloadLocale()
     const pluginName = ExtractPlugin.pluginName
 
@@ -122,9 +120,14 @@ export default class ExtractPlugin implements webpack.Plugin {
       compilation.hooks.finishModules.tapPromise(pluginName, async (modules) => {
         for (const module of this.getContextModules(modules)) {
           if (this.shouldRebuildContextModule(module)) {
-            await new Promise((resolve, reject) => {
+            await new Promise<void>((resolve, reject) => {
               // @ts-ignore
-              compilation.rebuildModule(module, (err) => (err ? reject(err) : resolve()))
+              if (typeof compilation.rebuildModule === 'function') {
+                // @ts-ignore
+                compilation.rebuildModule(module, (err) => (err ? reject(err) : resolve()))
+              } else {
+                resolve()
+              }
             })
           }
         }
@@ -158,7 +161,11 @@ export default class ExtractPlugin implements webpack.Plugin {
 
   // 判断是否需要重新编译上下文模块
   shouldRebuildContextModule(module: Module) {
-    const { blocks } = module as any
+    const { blocks: moduleBlocks } = module as any
+    let blocks
+    try {
+      blocks = Array.from(moduleBlocks)
+    } catch (e) {}
     const blockLocales = Array.isArray(blocks)
       ? new Set(blocks.map((dep) => path.resolve(this.tmpDir, dep.request || '')))
       : null
@@ -175,30 +182,6 @@ export default class ExtractPlugin implements webpack.Plugin {
       }
     }
     return false
-  }
-
-  // 初始化清理
-  clear() {
-    this.locales.clear()
-    this.localeFiles.clear()
-    this.clearFiles(this.tmpDir)
-  }
-
-  // 清理临时文件
-  clearFiles(dir: string, excludes?: Set<string>) {
-    dir = path.resolve(dir)
-    if (fs.existsSync(dir)) {
-      for (const file of fs.readdirSync(dir)) {
-        const filepath = path.join(dir, file)
-        if (excludes && excludes.has(filepath)) {
-          continue
-        }
-        if (filepath !== this.runtime && filepath !== this.preload) {
-          this.localeFiles.delete(filepath)
-          fs.unlinkSync(filepath)
-        }
-      }
-    }
   }
 
   // 检查目录可用性
@@ -235,24 +218,30 @@ export default class ExtractPlugin implements webpack.Plugin {
 
   // 将导出的语言定义数据抽出成单独的语言文件模块
   async extract(exports: any, hash: string) {
-    const { hashMap } = this
-    if (!hashMap.has(hash)) {
-      hashMap.set(hash, hashMap.size)
-    }
-    const namespace = hashMap.get(hash)
+    const namespace = hash
 
-    for (const [loc, data] of getEntries(exports)) {
+    const exportsEntries = getEntries(exports)
+    for (const entry of exportsEntries) {
+      const [loc, data] = entry
       const [locale] = normalizeLocale(loc)
+      entry[0] = locale
+
       if (!this.locales.has(locale)) {
         this.locales.set(locale, {})
       }
-      const localeData = this.locales.get(locale)
-      localeData![namespace!] = data
+      const localeData = this.locales.get(locale)!
+      localeData[namespace] = data
+    }
+    const exportsLocales = new Set(exportsEntries.map(([loc]) => loc))
+    for (const [locale, storage] of this.locales) {
+      if (!exportsLocales.has(locale)) {
+        delete storage[namespace]
+      }
     }
 
     const { esModule, optimize } = this.options
-    // 同步写入临时语言定义文件
-    this.writeLocalesFile(optimize ? this.optimize() : this.locales)
+    // 同步更新临时语言定义文件
+    this.updateLocalesFile(optimize ? this.optimize() : this.locales)
 
     const runtime = JSON.stringify(this.runtime)
     const loader = 'asyncLoader'
@@ -291,23 +280,30 @@ export default class ExtractPlugin implements webpack.Plugin {
   }
 
   // 生成临时的locale文件
-  writeLocalesFile(locales: Map<string, any>) {
+  updateLocalesFile(locales: Map<string, any>) {
     for (const [loc, data] of locales) {
       const file = `${path.resolve(this.tmpDir, loc)}.json`
-      const content = `${JSON.stringify(data, null, 2)}`
-      // 这里对文件内容进行下缓存判定，减少磁盘IO
-      if (this.localeFiles.get(file) === content) {
-        continue
+      if (!Object.keys(data).length) {
+        this.locales.delete(loc)
+        this.localeFiles.delete(file)
+        // 已经没有有效数据了，清理该文件
+        fs.unlinkSync(file)
+      } else {
+        const content = `${JSON.stringify(data, null, 2)}`
+        // 这里对文件内容进行下缓存判定，减少磁盘IO
+        if (this.localeFiles.get(file) === content) {
+          continue
+        }
+        writeFileSync(file, content)
+        this.localeFiles.set(file, content)
       }
-      writeFileSync(file, content)
-      this.localeFiles.set(file, content)
     }
   }
 
   // 创建运行时代码
   createRuntime() {
     const { outputDir, esModule, optimize, preload, preloadEagerMode } = this.options
-    const output = typeof outputDir === 'string' ? outputDir : 'locales'
+    const output = outputDir || 'locales'
     if (path.isAbsolute(output) || output.startsWith('..')) {
       throw new Error('Arguments Error: outputDir must be relative to build path')
     }

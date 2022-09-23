@@ -3,8 +3,9 @@ import path from 'path'
 import vm from 'vm'
 import * as babel from '@babel/core'
 import * as webpack from 'webpack'
-import { getHashDigest, getOptions } from 'loader-utils'
+import { getOptions } from 'loader-utils'
 import { normalizePath } from '../lib/utils'
+import createHashName from '../lib/createHashName'
 import merge from '../lib/merge'
 import loadResource from '../lib/resource'
 import { LoaderOptions, LoaderType } from '../Plugin'
@@ -66,7 +67,7 @@ function evalModuleCode(this: LoaderContext, code: string) {
     module,
     exports: module.exports,
     require: (file: string) => {
-      file = file.split('!').pop()!.replace(/\?.*/, '')
+      file = file.split(/[!|]/).pop()!.replace(/\?.*/, '')
       file = path.isAbsolute(file) ? file : path.join(this.context, file)
       if (isRuntimeModule(file)) {
         dependencies.add(file.replace(/(?:\.js)?$/, '.js'))
@@ -103,7 +104,7 @@ async function getModuleCode(this: LoaderContext, source: string, options: Loade
   }
 
   const { extractor } = options
-  const hash = getHashDigest(Buffer.from(resourcePath), 'md4', 'hex', 8)
+  const hash = createHashName(resourcePath, 6)
   const code = await extractor!.extract(exports, hash)
   return `
     /** ${normalizePath(resourcePath, cwd)} (extracted) **/
