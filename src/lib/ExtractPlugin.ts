@@ -224,6 +224,9 @@ export default class ExtractPlugin implements webpack.Plugin {
     for (const entry of exportsEntries) {
       const [loc, data] = entry
       const [locale] = normalizeLocale(loc)
+      if (!locale) {
+        continue
+      }
       entry[0] = locale
 
       if (!this.locales.has(locale)) {

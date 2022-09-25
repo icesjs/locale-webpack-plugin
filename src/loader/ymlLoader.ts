@@ -151,7 +151,7 @@ const ymlLoader: LoaderType = function (this: LoaderContext, source: string | Bu
 
 ymlLoader.pitch = pitch
 ymlLoader.test = /\.(?:ya?ml|json)$/
-ymlLoader.resourceQuery = /ya?ml|json_include/
+ymlLoader.resourceQuery = /ya?ml|json_locale/
 ymlLoader.filepath = __filename
-ymlLoader.extensions = ['.yml', '.yaml', '.json_include']
+ymlLoader.extensions = ['.yml', '.yaml', '.json_locale']
 export default ymlLoader

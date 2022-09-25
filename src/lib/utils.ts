@@ -85,6 +85,10 @@ export function isSamePath(a: string, b: string, base: string = process.cwd()) {
   return a.replace(/[/\\]+$/, '') === b.replace(/[/\\]+$/, '')
 }
 
+function getCharString(str: string) {
+  return /^[a-z]+$/i.test(str) ? str : ''
+}
+
 /**
  * 获取格式化后的语言区域。
  * @param locale 需要格式化的区域语言代码字符串。
@@ -96,9 +100,9 @@ export function normalizeLocale(locale?: string) {
   }
   const [langArea] = locale.split('.')
   const [lang, area = ''] = langArea.split(/[-_]/)
-  const lowerLang = lang.toLowerCase()
-  const upperArea = area.toUpperCase()
-  return [`${lowerLang}${area ? '-' + upperArea : ''}`, lowerLang, upperArea]
+  const lowerLang = getCharString(lang.toLowerCase())
+  const upperArea = getCharString(area.toUpperCase())
+  return [`${lowerLang}${upperArea ? `-${upperArea}` : ''}`, lowerLang, upperArea]
 }
 
 /**

@@ -1,4 +1,6 @@
 //
+import { normalizeLocale } from './utils'
+
 export type DataType = string | number | boolean | object | null | undefined
 export type ParsedDataType = Exclude<DataType, undefined>
 export type LocaleData = { [key: string]: Exclude<ParsedDataType, object> }
@@ -11,12 +13,21 @@ export type LocaleDataSet = { [locale: string]: LocaleData }
  * @param data 待合并的数据
  */
 function mergeLocaleData(dataSet: LocaleDataSet, locale: string, data: LocaleData) {
-  let localeData: LocaleData = dataSet[locale]
-  if (!localeData) {
-    dataSet[locale] = localeData = {}
+  const [lang] = normalizeLocale(locale)
+  if (!lang) {
+    return
   }
-  for (const [key, val] of Object.entries(data)) {
-    localeData[key] = val
+  let localeData: LocaleData = dataSet[lang]
+  if (!localeData) {
+    dataSet[lang] = localeData = {}
+  }
+  for (const entry of Object.entries(data)) {
+    const [key, val] = entry as [string, ParsedDataType]
+    if (val !== null && typeof val === 'object') {
+      localeData[key] = ''
+    } else {
+      localeData[key] = val
+    }
   }
 }
 
@@ -27,16 +38,8 @@ function mergeLocaleData(dataSet: LocaleDataSet, locale: string, data: LocaleDat
  * @param data 待合并的消息对象
  */
 function mergeLocaleObject(dataSet: LocaleDataSet, locale: string, data: object) {
-  const localeData: LocaleData = {}
-  for (const entry of Object.entries(data)) {
-    const [key, val] = entry as [string, ParsedDataType]
-    if (val !== null && typeof val === 'object') {
-      localeData[key] = ''
-    } else {
-      localeData[key] = val
-    }
-  }
-  mergeLocaleData(dataSet, locale, localeData)
+  const localData = (data || {}) as LocaleData
+  mergeLocaleData(dataSet, locale, localData)
 }
 
 /**
@@ -50,15 +53,17 @@ function mergeData(dataSet: LocaleDataSet, data: ParsedDataType, locale?: string
     return
   }
   const localeData: LocaleData = {}
+  let expectMergeFile = false
   for (const entry of Object.entries(data)) {
     const [key, val] = entry as [string, ParsedDataType]
     if (val === null || typeof val !== 'object') {
       localeData[key] = val
+      expectMergeFile = true
       continue
     }
     mergeLocaleObject(dataSet, key, val)
   }
-  if (locale && Object.keys(localeData).length) {
+  if (locale && expectMergeFile) {
     mergeLocaleData(dataSet, locale, localeData)
   }
 }
