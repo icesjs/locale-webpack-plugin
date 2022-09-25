@@ -13,6 +13,7 @@ import fs from 'fs'
 import path from 'path'
 import yaml from 'js-yaml'
 import { normalizePath } from './utils'
+import { removeDirectives } from './include'
 import { DataType, ParsedDataType } from './merge'
 
 type LoadResult = { data: ParsedDataType; warnings: Warning[] }
@@ -156,6 +157,9 @@ function check(data: LoadResult['data'], file: string) {
 export default function loadResource(source: string | Buffer, file: string) {
   if (Buffer.isBuffer(source)) {
     source = source.toString('utf8')
+  }
+  if (/\.ya?ml$/i.test(file)) {
+    source = removeDirectives(source)
   }
   const warningList = []
   const { warnings, data } = loadFile(source, path.extname(file))

@@ -9,6 +9,10 @@
  * - \#include <.xxx> 为有效路径，表示 node_modules 目录下面的 .xxx 文件
  * - ••#include••"••xxx••"••、••#include••<••xxx••>•• 为有效指令，其中••为空格字符
  *
+ *  新增 <<: 规则支持。
+ *  <<: *xx 为标准中的引用锚点。
+ *  扩展规则为 <<: "xxx", <<: <xxx>, <<: xxx 为从文件xxx中导入到当前文件。
+ *
  * 文件名解析规则：
  * 不带后缀时，以 .yml 和 .yaml 为规则进行解析
  * 文件为目录时，以目录下面的 index.yml 和 index.yaml 进行解析
@@ -21,9 +25,9 @@ import { getEntries, normalizePath } from './utils'
 // 匹配指令声明的正则表达式
 // 0号元素为指令 分组1为引号、分组2为contextPath、分组3为modulePath
 const directiveRegx =
-  /^\s*#include(?=[<'"\s](?!['"<>.\\/\s;]*$))\s*(?:(['"]?)\s*([^'"<>:*?|]+?)\s*\1|<(?!\s*(?:\.*[/\\]|\.{2,}))\s*([^'"<>:*?|]+?)\s*>)[\s;]*$/gm
+  /^\s*(?:#include|<<:)(?=[<'"\s](?!['"<>.\\/\s*;]*$))\s*(?:(['"]?)\s*([^'"<>:*?|]+?)\s*\1|<(?!\s*(?:\.*[/\\]|\.{2,}))\s*([^'"<>:*?|]+?)\s*>)[\s;]*$/gm
 // 检查指令是否正确的正则表达式
-const checkDirectiveRegx = /^\s*#\s*include(?:[<'"]|\s(?!\s*$)).*$/gm
+const checkDirectiveRegx = /^\s*(?:#\s*include|<<:(?!\s+\*))(?:[<'"]|\s(?!\s*$)).*$/gm
 // 解析文件名称的后缀
 const resolveExtensions = ['.yml', '.yaml', '.json']
 // 当前工作目录
@@ -239,8 +243,8 @@ async function parseDirective(
       )
     }
 
-    // 检查文件是否使用了不符合语法的#include指令，并给出提示
     contents.push(source.substring(contentsLastIndex))
+    // 检查文件是否使用了不符合语法的#include指令，并给出提示
     checkContents(
       contents.map((str) => str.replace(/^\r?\n/, '')).join(''),
       fileNode,
@@ -367,6 +371,24 @@ function serializeFiles(fileNodes: FileNodeType[]) {
     }
   }
   return fileList.map(({ file, source, context }) => ({ file, source, context }))
+}
+
+/**
+ * 清除文件中的指令声明行。
+ * @param source 文件内容。
+ */
+export function removeDirectives(source: string) {
+  const regx = getDirectiveRegx()
+  const contents = []
+  let contentsLastIndex = 0
+  let matched
+  // 这里的正则是多行匹配模式
+  while ((matched = regx.exec(source))) {
+    contents.push(source.substring(contentsLastIndex, matched.index))
+    contentsLastIndex = regx.lastIndex
+  }
+  contents.push(source.substring(contentsLastIndex))
+  return contents.join('')
 }
 
 /**
