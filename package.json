@@ -1,6 +1,6 @@
 {
   "name": "@ices/locale-webpack-plugin",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "webpack plugin for parsing locale files",
   "main": "dist/index.js",
   "types": "types/index.d.ts",

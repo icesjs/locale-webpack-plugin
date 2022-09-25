@@ -279,16 +279,16 @@ export default class ExtractPlugin implements webpack.Plugin {
     return locales
   }
 
-  // 生成临时的locale文件
+  // 更新临时的locale文件
   updateLocalesFile(locales: Map<string, any>) {
+    const validFiles = new Set<string>()
     for (const [loc, data] of locales) {
       const file = `${path.resolve(this.tmpDir, loc)}.json`
       if (!Object.keys(data).length) {
         this.locales.delete(loc)
         this.localeFiles.delete(file)
-        // 已经没有有效数据了，清理该文件
-        fs.unlinkSync(file)
       } else {
+        validFiles.add(file)
         const content = `${JSON.stringify(data, null, 2)}`
         // 这里对文件内容进行下缓存判定，减少磁盘IO
         if (this.localeFiles.get(file) === content) {
@@ -296,6 +296,15 @@ export default class ExtractPlugin implements webpack.Plugin {
         }
         writeFileSync(file, content)
         this.localeFiles.set(file, content)
+      }
+    }
+    // 清理失效的文件
+    for (const filename of fs.readdirSync(this.tmpDir)) {
+      const filepath = path.join(this.tmpDir, filename)
+      if (filepath.endsWith('.json')) {
+        if (!validFiles.has(filepath)) {
+          fs.unlinkSync(filepath)
+        }
       }
     }
   }
